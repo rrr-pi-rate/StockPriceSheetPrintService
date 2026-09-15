@@ -67,7 +67,11 @@ namespace StockPriceSheetPrintService.Outbound.HtmlScraping
 
 			var date = DateTimeOffset.FromUnixTimeSeconds(timestamp).LocalDateTime;
 
-			return JuneMapper.ToFundNav(new JuneData { Nav = price, Date = date });
+			var currency = result.GetProperty("meta").TryGetProperty("currency", out var currencyProp)
+				? currencyProp.GetString()
+				: null;
+
+			return JuneMapper.ToFundNav(new JuneData { Nav = price, Date = date, Currency = currency });
 		}
 	}
 }
