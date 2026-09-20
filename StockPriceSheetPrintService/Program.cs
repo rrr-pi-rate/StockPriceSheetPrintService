@@ -51,7 +51,6 @@ builder.Services.AddHttpClient("StockApi", client =>
 builder.Services.AddHttpClient("NationalbankApi", c =>
 {
 	c.BaseAddress = new Uri("https://www.nationalbanken.dk/");
-	c.DefaultRequestHeaders.Add("User-Agent", "StockPriceSheetPrintService/1.0 https://github.com/rrr-pi-rate/StockPriceSheetPrintService");
 });
 
 builder.WebHost.ConfigureKestrel(options =>
