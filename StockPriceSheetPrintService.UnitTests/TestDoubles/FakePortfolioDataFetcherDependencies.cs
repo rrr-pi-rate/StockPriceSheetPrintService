@@ -6,8 +6,17 @@ namespace StockPriceSheetPrintService.UnitTests.TestDoubles
 {
 	public class FakeSaxoTokenService : ISaxoTokenService
 	{
-		public Task<string?> GetAccessTokenAsync(ClientContext ctx, CancellationToken ct) =>
-			throw new NotSupportedException("Not used by these tests");
+		public bool ThrowIfCalled { get; set; }
+		public string? TokenToReturn { get; set; } = "fake-token";
+		public int CallCount { get; private set; }
+
+		public Task<string?> GetAccessTokenAsync(ClientContext ctx, CancellationToken ct)
+		{
+			CallCount++;
+			if (ThrowIfCalled)
+				throw new NotSupportedException("Not used by these tests");
+			return Task.FromResult(TokenToReturn);
+		}
 	}
 
 	public class FakeSaxoAccountService : ISaxoAccountService

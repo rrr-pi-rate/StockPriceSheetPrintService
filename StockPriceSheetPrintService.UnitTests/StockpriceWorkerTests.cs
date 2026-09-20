@@ -3,10 +3,21 @@ using StockPriceSheetPrintService.UnitTests.TestDoubles;
 
 namespace StockPriceSheetPrintService.UnitTests
 {
+	// Gør den protected ExecuteAsync (fra BackgroundService) kaldbar fra en test,
+	// uden at ændre selve produktionsklassens synlighed.
+	file class TestableStockpriceWorker(
+		Microsoft.Extensions.Logging.ILogger<StockpriceWorker> logger,
+		StockPriceSheetPrintService.Service.Ports.Outbound.ISaxoTokenService saxoTokenService,
+		StockPriceSheetPrintService.Service.Ports.Inbound.IPortfolioJobRunner jobRunner,
+		SchedulerStatusStore statusStore) : StockpriceWorker(logger, saxoTokenService, jobRunner, statusStore)
+	{
+		public Task InvokeExecuteAsync(CancellationToken ct) => ExecuteAsync(ct);
+	}
+
 	public class StockpriceWorkerTests
 	{
-		private static StockpriceWorker CreateWorker(FakePortfolioJobRunner jobRunner, SchedulerStatusStore statusStore) =>
-			new(new TestLogger<StockpriceWorker>(), new FakeSaxoTokenService(), jobRunner, statusStore);
+		private static StockpriceWorker CreateWorker(FakePortfolioJobRunner jobRunner, SchedulerStatusStore statusStore, FakeSaxoTokenService? saxoTokenService = null) =>
+			new(new TestLogger<StockpriceWorker>(), saxoTokenService ?? new FakeSaxoTokenService(), jobRunner, statusStore);
 
 		[Fact]
 		public void GetNextRunTime_ReturnsATimeAtTheGivenHourAndMinute_InTheFuture()
@@ -75,6 +86,57 @@ namespace StockPriceSheetPrintService.UnitTests
 
 			Assert.Null(statusStore.LastRunSucceeded);
 			Assert.Null(statusStore.LastRunAt);
+		}
+
+		[Fact]
+		public async Task PerformStartupTokenRefreshAsync_CallsSaxoTokenService()
+		{
+			var saxoTokenService = new FakeSaxoTokenService();
+			var worker = CreateWorker(new FakePortfolioJobRunner(), new SchedulerStatusStore(), saxoTokenService);
+
+			await worker.PerformStartupTokenRefreshAsync(CancellationToken.None);
+
+			Assert.Equal(1, saxoTokenService.CallCount);
+		}
+
+		[Fact]
+		public async Task WaitUntilNextRunAsync_WaitsUntilTheGivenTime_WithoutRefreshingToken_WhenCloseToTarget()
+		{
+			var saxoTokenService = new FakeSaxoTokenService();
+			var worker = CreateWorker(new FakePortfolioJobRunner(), new SchedulerStatusStore(), saxoTokenService);
+			// Under 45 min til target -> springer refresh-loopet over, venter bare den korte tid.
+			var nextRunUtc = DateTimeOffset.UtcNow.AddMilliseconds(200);
+
+			await worker.WaitUntilNextRunAsync(nextRunUtc, CancellationToken.None);
+
+			// Task.Delay's timer-præcision kan i sjældne tilfælde afvige nogle få ms -
+			// giv en lille margin i stedet for et strengt ">=" der er sårbart over for det.
+			Assert.True(DateTimeOffset.UtcNow >= nextRunUtc.AddMilliseconds(-20));
+			Assert.Equal(0, saxoTokenService.CallCount);
+		}
+
+		[Fact]
+		public async Task WaitUntilNextRunAsync_ReturnsImmediately_WhenTargetIsInThePast()
+		{
+			var worker = CreateWorker(new FakePortfolioJobRunner(), new SchedulerStatusStore());
+			var nextRunUtc = DateTimeOffset.UtcNow.AddMinutes(-1);
+
+			await worker.WaitUntilNextRunAsync(nextRunUtc, CancellationToken.None);
+
+			// Ingen assertion udover at den rent faktisk returnerer uden at hænge/vente.
+		}
+
+		[Fact]
+		public async Task ExecuteAsync_PerformsStartupRefresh_AndStopsImmediately_WhenAlreadyCancelled()
+		{
+			var saxoTokenService = new FakeSaxoTokenService();
+			var jobRunner = new FakePortfolioJobRunner();
+			var worker = new TestableStockpriceWorker(new TestLogger<StockpriceWorker>(), saxoTokenService, jobRunner, new SchedulerStatusStore());
+
+			await worker.InvokeExecuteAsync(new CancellationToken(canceled: true));
+
+			Assert.Equal(1, saxoTokenService.CallCount);
+			Assert.Equal(0, jobRunner.CallCount);
 		}
 	}
 }

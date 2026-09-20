@@ -46,7 +46,7 @@ namespace StockPriceSheetPrintService.Service.Application
 			}
 		}
 
-		private async Task PerformStartupTokenRefreshAsync(CancellationToken stoppingToken)
+		internal async Task PerformStartupTokenRefreshAsync(CancellationToken stoppingToken)
 		{
 			_logger.LogInformation("[STARTUP] Performing initial token refresh...");
 			var startupCtx = ClientContextFactory.New("Startup:TokenRefresh");
@@ -68,7 +68,7 @@ namespace StockPriceSheetPrintService.Service.Application
 			return candidate;
 		}
 
-		private async Task WaitUntilNextRunAsync(DateTimeOffset nextRunUtc, CancellationToken stoppingToken)
+		internal async Task WaitUntilNextRunAsync(DateTimeOffset nextRunUtc, CancellationToken stoppingToken)
 		{
 			while (DateTimeOffset.UtcNow < nextRunUtc && !stoppingToken.IsCancellationRequested)
 			{
