@@ -38,9 +38,11 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
-          dotnet sonarscanner begin /k:"Hjaltechristensen_StockPriceSheetPrintService" /o:"hjaltechristensen" /d:sonar.token="$SONAR_TOKEN" /d:sonar.host.url="https://sonarcloud.io"
+          dotnet sonarscanner begin /k:"Hjaltechristensen_StockPriceSheetPrintService" /o:"hjaltechristensen" /d:sonar.token="$SONAR_TOKEN" /d:sonar.host.url="https://sonarcloud.io" /d:sonar.cs.cobertura.reportsPaths="**/coverage.cobertura.xml"
       - name: Build and test
-        run: dotnet test --project ArchUnitTest/ArchUnitTest.csproj --configuration Release
+        run: |
+          dotnet test --project ArchUnitTest/ArchUnitTest.csproj --configuration Release
+          dotnet test --project StockPriceSheetPrintService.UnitTests/StockPriceSheetPrintService.UnitTests.csproj --configuration Release --coverage --coverage-output-format cobertura --coverage-output coverage.cobertura.xml
       - name: End analysis
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
