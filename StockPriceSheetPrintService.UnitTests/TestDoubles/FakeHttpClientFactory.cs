@@ -13,6 +13,9 @@ namespace StockPriceSheetPrintService.UnitTests.TestDoubles
 
 	public class FakeHttpClientFactory(HttpStatusCode statusCode, string responseBody) : IHttpClientFactory
 	{
-		public HttpClient CreateClient(string name) => new(new FakeHttpMessageHandler(statusCode, responseBody));
+		public HttpClient CreateClient(string name) => new(new FakeHttpMessageHandler(statusCode, responseBody))
+		{
+			BaseAddress = new Uri("https://example.com/")
+		};
 	}
 }

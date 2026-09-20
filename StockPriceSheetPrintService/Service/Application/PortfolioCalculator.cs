@@ -9,6 +9,7 @@ namespace StockPriceSheetPrintService.Service.Application
 		IHttpClientFactory httpClientFactory,
 		ILogger<PortfolioCalculator> logger,
 		IHtmlScraper htmlScraper,
+		IMarketStackService marketStackService,
 		IConfiguration configuration,
 		IJuneStore juneStore,
 		INordnetSymbolStore nordnetSymbolStore) : IPortfolioCalculator
@@ -16,6 +17,7 @@ namespace StockPriceSheetPrintService.Service.Application
 		private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
 		private readonly ILogger<PortfolioCalculator> _logger = logger;
 		private readonly IHtmlScraper _htmlScraper = htmlScraper;
+		private readonly IMarketStackService _marketStackService = marketStackService;
 		private readonly IConfiguration _configuration = configuration;
 		private readonly IJuneStore _juneStore = juneStore;
 		private readonly INordnetSymbolStore _nordnetSymbolStore = nordnetSymbolStore;
@@ -33,31 +35,18 @@ namespace StockPriceSheetPrintService.Service.Application
 			["XCSE"] = "DKK",
 		};
 
-		public async Task<decimal> CalculateTotalStockValueAsync(List<StockPrice> prices, ClientContext ctx, CancellationToken ct)
+		public async Task<decimal> CalculateTotalStockValueAsync(ClientContext ctx, CancellationToken ct)
 		{
 			decimal totalPrice = 0;
-			if (prices == null) return 0;
 
 			_exchangeRateCache = null;
 			var rates = await GetExchangeRatesAsync(ct);
 
 			var nordnetSymbols = await _nordnetSymbolStore.GetSymbolsAsync();
-			var pricesBySymbol = prices.ToDictionary(p => p.Symbol, p => p);
 
 			foreach (var (symbol, multiplier) in nordnetSymbols)
 			{
-				if (!pricesBySymbol.TryGetValue(symbol, out var d))
-					d = new StockPrice { Symbol = symbol };
-
-				if (d.Close is null or 0m)
-				{
-					_logger.LogWarning("Closing price was null/0 or missing from MarketStack for {Symbol} - Redirecting to YahooFinance", symbol);
-					var yahooData = await _htmlScraper.GetFromYahooApiAsync(symbol, ctx, ct);
-					d.Date = yahooData?.Date ?? d.Date;
-					d.Close = yahooData?.Nav ?? d.Close ?? 0m;
-					if (string.IsNullOrEmpty(d.Currency))
-						d.Currency = yahooData?.Currency ?? d.Currency;
-				}
+				var d = await GetPriceAsync(symbol, ctx, ct);
 
 				var effectiveCurrency = !string.IsNullOrEmpty(d.Currency) ? d.Currency
 					: (ExchangeCurrencyFallback.TryGetValue(d.Exchange ?? "", out var fb) ? fb : "?");
@@ -71,6 +60,40 @@ namespace StockPriceSheetPrintService.Service.Application
 
 			_logger.LogInformation("[JOB] Total stock value: {totalPrice:F2} DKK", totalPrice);
 			return totalPrice;
+		}
+
+		// Yahoo Finance er primær kilde pr. symbol; MarketStack kaldes kun som backup,
+		// og kun for det specifikke symbol Yahoo fejlede på (ikke som en forudgående batch).
+		private async Task<StockPrice> GetPriceAsync(string symbol, ClientContext ctx, CancellationToken ct)
+		{
+			FundNav? yahooData = null;
+			try
+			{
+				yahooData = await _htmlScraper.GetFromYahooApiAsync(symbol, ctx, ct);
+			}
+			catch (Exception ex)
+			{
+				_logger.LogWarning(ex, "[STOCK-PRICE] Yahoo Finance-opslag fejlede for {Symbol}", symbol);
+			}
+
+			if (yahooData != null && yahooData.Nav != 0m)
+			{
+				return new StockPrice
+				{
+					Symbol = symbol,
+					Date = yahooData.Date,
+					Close = yahooData.Nav,
+					Currency = yahooData.Currency ?? string.Empty
+				};
+			}
+
+			_logger.LogWarning("[STOCK-PRICE] Yahoo Finance havde ingen kurs for {Symbol} – falder tilbage til MarketStack", symbol);
+			var marketStackPrice = await _marketStackService.GetStockPriceAsync(symbol, ctx, ct);
+			if (marketStackPrice != null && marketStackPrice.Close is not (null or 0m))
+				return marketStackPrice;
+
+			_logger.LogError("[STOCK-PRICE] Hverken Yahoo Finance eller MarketStack havde en kurs for {Symbol}", symbol);
+			return new StockPrice { Symbol = symbol };
 		}
 
 		public async Task<decimal> FindTotalJuneValueAsync(ClientContext ctx, CancellationToken ct)
