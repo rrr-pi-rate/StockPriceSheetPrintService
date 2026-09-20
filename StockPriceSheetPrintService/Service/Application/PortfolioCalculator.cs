@@ -42,26 +42,30 @@ namespace StockPriceSheetPrintService.Service.Application
 			var rates = await GetExchangeRatesAsync(ct);
 
 			var nordnetSymbols = await _nordnetSymbolStore.GetSymbolsAsync();
-			foreach (var d in prices)
+			var pricesBySymbol = prices.ToDictionary(p => p.Symbol, p => p);
+
+			foreach (var (symbol, multiplier) in nordnetSymbols)
 			{
-				if (!nordnetSymbols.TryGetValue(d.Symbol, out decimal multiplier))
-					continue;
+				if (!pricesBySymbol.TryGetValue(symbol, out var d))
+					d = new StockPrice { Symbol = symbol };
+
+				if (d.Close is null or 0m)
+				{
+					_logger.LogWarning("Closing price was null/0 or missing from MarketStack for {Symbol} - Redirecting to YahooFinance", symbol);
+					var yahooData = await _htmlScraper.GetFromYahooApiAsync(symbol, ctx, ct);
+					d.Date = yahooData?.Date ?? d.Date;
+					d.Close = yahooData?.Nav ?? d.Close ?? 0m;
+					if (string.IsNullOrEmpty(d.Currency))
+						d.Currency = yahooData?.Currency ?? d.Currency;
+				}
 
 				var effectiveCurrency = !string.IsNullOrEmpty(d.Currency) ? d.Currency
 					: (ExchangeCurrencyFallback.TryGetValue(d.Exchange ?? "", out var fb) ? fb : "?");
 
-				if (d.Close is null or 0m)
-				{
-					_logger.LogWarning("Closing price was null/0 for {Symbol} - Redirecting to YahooFinance", d.Symbol);
-					var yahooData = await _htmlScraper.GetFromYahooApiAsync(d.Symbol, ctx, ct);
-					d.Date = yahooData?.Date ?? d.Date;
-					d.Close = yahooData?.Nav ?? d.Close ?? 0m;
-				}
-
 				var closePrice = d.Close ?? 0m;
 				var priceInDkk = ConvertCurrencyToDkk(closePrice, d.Currency, d.Exchange, rates);
 				_logger.LogInformation("[JOB] {Multiplier} x {Symbol} closed at: {Close} {Currency} = {Dkk:F4} DKK, total: {Total:F2} DKK",
-					multiplier, d.Symbol, closePrice, effectiveCurrency, priceInDkk, multiplier * priceInDkk);
+					multiplier, symbol, closePrice, effectiveCurrency, priceInDkk, multiplier * priceInDkk);
 				totalPrice += priceInDkk * multiplier;
 			}
 
