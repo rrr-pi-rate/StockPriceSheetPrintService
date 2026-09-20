@@ -22,6 +22,7 @@ namespace StockPriceSheetPrintService.Service.Application
 		private readonly IJuneStore _juneStore = juneStore;
 		private readonly INordnetSymbolStore _nordnetSymbolStore = nordnetSymbolStore;
 		private Dictionary<string, decimal>? _exchangeRateCache;
+		private DateTime _cacheDate;
 
 		private static readonly Dictionary<string, string> ExchangeCurrencyFallback = new()
 		{
@@ -142,7 +143,7 @@ namespace StockPriceSheetPrintService.Service.Application
 
 		private async Task<Dictionary<string, decimal>> GetExchangeRatesAsync(CancellationToken ct)
 		{
-			if (_exchangeRateCache != null)
+			if (_exchangeRateCache != null && _cacheDate.Date == DateTime.UtcNow.Date)
 				return _exchangeRateCache;
 
 			var client = _httpClientFactory.CreateClient("NationalbankApi");
@@ -166,10 +167,11 @@ namespace StockPriceSheetPrintService.Service.Application
 				}
 			}
 
-			_logger.LogInformation("[CURRENCY] Exchange rates including Nordnet margin – USD: {usd:F4} DKK, EUR: {eur:F4} DKK",
+			_logger.LogInformation("[CURRENCY] Exchange rates – USD: {usd:F4} DKK, EUR: {eur:F4} DKK",
 				_exchangeRateCache.GetValueOrDefault("USD"),
 				_exchangeRateCache.GetValueOrDefault("EUR"));
 
+			_cacheDate = DateTime.UtcNow;
 			return _exchangeRateCache;
 		}
 	}
