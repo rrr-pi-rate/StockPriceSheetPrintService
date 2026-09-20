@@ -38,7 +38,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
-          dotnet sonarscanner begin /k:"Hjaltechristensen_StockPriceSheetPrintService" /o:"hjaltechristensen" /d:sonar.token="$SONAR_TOKEN" /d:sonar.host.url="https://sonarcloud.io" /d:sonar.cs.cobertura.reportsPaths="**/coverage.cobertura.xml" /d:sonar.coverage.exclusions="**/GeminiReportInsightsImpl.cs"
+          dotnet sonarscanner begin /k:"Hjaltechristensen_StockPriceSheetPrintService" /o:"hjaltechristensen" /d:sonar.token="$SONAR_TOKEN" /d:sonar.host.url="https://sonarcloud.io" /d:sonar.cs.cobertura.reportsPaths="**/coverage.cobertura.xml" /d:sonar.coverage.exclusions="**/GeminiReportInsightsImpl.cs" /d:sonar.exclusions=".dotnet/**"
       - name: Build and test
         run: |
           dotnet test --project ArchUnitTest/ArchUnitTest.csproj --configuration Release
