@@ -21,7 +21,6 @@ namespace StockPriceSheetPrintService.Service.Application
 		private readonly IConfiguration _configuration = configuration;
 		private readonly IJuneStore _juneStore = juneStore;
 		private readonly INordnetSymbolStore _nordnetSymbolStore = nordnetSymbolStore;
-		private const decimal NordnetFxMargin = 0.0025m;
 		private Dictionary<string, decimal>? _exchangeRateCache;
 
 		private static readonly Dictionary<string, string> ExchangeCurrencyFallback = new()
@@ -163,7 +162,7 @@ namespace StockPriceSheetPrintService.Service.Application
 				if (code != null && rateStr != null &&
 					decimal.TryParse(rateStr, NumberStyles.Any, new CultureInfo("da-DK"), out decimal rate))
 				{
-					_exchangeRateCache[code] = (rate / 100m) * (1 - NordnetFxMargin);
+					_exchangeRateCache[code] = (rate / 100m);
 				}
 			}
 
