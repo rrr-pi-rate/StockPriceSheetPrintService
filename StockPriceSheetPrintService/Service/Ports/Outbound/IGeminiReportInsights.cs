@@ -5,8 +5,7 @@ namespace StockPriceSheetPrintService.Service.Ports.Outbound
 	public interface IGeminiReportInsights
 	{
 		Task<string?> GetInsightsAsync(
-			decimal saxoBalance, decimal nordnetValue, decimal juneValue,
-			decimal total, decimal previousDayValue,
+			PortfolioValues values, decimal previousDayValue,
 			List<Transfer> newTransfers,
 			List<string> nordnetTickers,
 			List<Instrument> saxoPositions,

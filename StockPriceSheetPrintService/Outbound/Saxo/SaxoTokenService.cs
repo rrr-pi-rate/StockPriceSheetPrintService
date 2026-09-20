@@ -54,16 +54,15 @@ namespace StockPriceSheetPrintService.Outbound.Saxo
 					});
 
 					var response = await client.PostAsync(_tokenEndpoint, requestData, ct);
+					var responseBody = await response.Content.ReadAsStringAsync(ct);
 
 					if (!response.IsSuccessStatusCode)
 					{
-						_logger.LogError("[SAXO-TOKEN] Saxo rejected refresh token. Status: {status}",
-							(int)response.StatusCode);
+						_logger.LogError("[SAXO-TOKEN] Saxo rejected refresh token. Status: {status}. Body: {body}",
+							(int)response.StatusCode, responseBody);
 						await NotifyLoginRequired(ct);
 						return null;
 					}
-
-					var responseBody = await response.Content.ReadAsStringAsync(ct);
 
 					try
 					{

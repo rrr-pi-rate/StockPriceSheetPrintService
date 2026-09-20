@@ -3,6 +3,7 @@ using Google.Apis.Services;
 using Google.Apis.Sheets.v4;
 using Google.Apis.Sheets.v4.Data;
 using StockPriceSheetPrintService.Service;
+using StockPriceSheetPrintService.Service.Models;
 using StockPriceSheetPrintService.Service.Ports.Outbound;
 using System.Globalization;
 
@@ -60,7 +61,17 @@ namespace StockPriceSheetPrintService.Outbound.GoogleSheets
 				.ToList();
 		}
 
-		public async Task<decimal> UpdateGoogleSheetsCellAsync(string spreadsheetId, string sheetName, string totalValue, ClientContext ctx, CancellationToken ct)
+		// Arket bruger dansk lokalitet (komma som decimalseparator i formler),
+		// og tal-literaler i formler må ikke have tusindtalsseparator.
+		internal static string BuildTotalFormula(PortfolioValues values)
+		{
+			var danishCulture = CultureInfo.GetCultureInfo("da-DK");
+			return $"={values.Saxo.ToString("0.00", danishCulture)}" +
+				$"+{values.Nordnet.ToString("0.00", danishCulture)}" +
+				$"+{values.June.ToString("0.00", danishCulture)}";
+		}
+
+		public async Task<decimal> UpdateGoogleSheetsCellAsync(string spreadsheetId, string sheetName, PortfolioValues values, ClientContext ctx, CancellationToken ct)
 		{
 			var service = await CreateServiceAsync(ct);
 
@@ -86,6 +97,8 @@ namespace StockPriceSheetPrintService.Outbound.GoogleSheets
 			int nextRow = existingValues.Count + 1;
 			_logger.LogInformation("[SHEETS] Writing to row {row}", nextRow);
 
+			var formula = BuildTotalFormula(values);
+
 			var updateRange = $"'{sheetName}'!{DateColumn}{nextRow}:{ValueColumn}{nextRow}";
 			var valueRange = new ValueRange
 			{
@@ -93,7 +106,7 @@ namespace StockPriceSheetPrintService.Outbound.GoogleSheets
 				[
 					[
 						DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1)).ToString("dd/MM/yyyy"),
-						totalValue
+						formula
 					]
 				]
 			};
@@ -102,7 +115,8 @@ namespace StockPriceSheetPrintService.Outbound.GoogleSheets
 			updateRequest.ValueInputOption = SpreadsheetsResource.ValuesResource.UpdateRequest.ValueInputOptionEnum.USERENTERED;
 			await updateRequest.ExecuteAsync(ct);
 
-			_logger.LogInformation("[SHEETS] ✓ Value {value} written to {range}", totalValue, updateRange);
+			_logger.LogInformation("[SHEETS] ✓ Formula {formula} written to {range} (Saxo: {saxo:F2}, Nordnet: {nordnet:F2}, June: {june:F2})",
+				formula, updateRange, values.Saxo, values.Nordnet, values.June);
 			return dayBeforeValue;
 		}
 

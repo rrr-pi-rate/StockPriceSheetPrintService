@@ -1,3 +1,4 @@
+using StockPriceSheetPrintService.Service.Models;
 using StockPriceSheetPrintService.Service.Ports.Outbound;
 using System.Globalization;
 
@@ -29,9 +30,9 @@ namespace StockPriceSheetPrintService.Outbound.DiscordUpdates
 				_logger.LogWarning("[DISCORD] Discord:WebhookLogin configuration missing");
 		}
 
-		public async Task SendMorningReportAsync(decimal saxoBalance, decimal stockValue, decimal juneValue, decimal total, decimal dayBeforeValue, decimal? lastTransferAmount, string? geminiInsights, string atm, CancellationToken stoppingToken)
+		public async Task SendMorningReportAsync(PortfolioValues values, decimal dayBeforeValue, decimal? lastTransferAmount, string? geminiInsights, string atm, CancellationToken stoppingToken)
 		{
-			var payload = BuildPayload(saxoBalance, stockValue, juneValue, total, dayBeforeValue, lastTransferAmount, geminiInsights, atm);
+			var payload = BuildPayload(values, dayBeforeValue, lastTransferAmount, geminiInsights, atm);
 			await PublishDiscordMessage(_webhookUrl, payload, stoppingToken);
 		}
 
@@ -96,22 +97,23 @@ namespace StockPriceSheetPrintService.Outbound.DiscordUpdates
 			return value.ToString("N2", CultureInfo.GetCultureInfo("da-DK"));
 		}
 
-		private object BuildPayload(decimal saxoBalance, decimal stockValue, decimal juneValue, decimal total, decimal dayBeforeValue, decimal? lastTransferAmount, string? geminiInsights, string atm)
+		private object BuildPayload(PortfolioValues values, decimal dayBeforeValue, decimal? lastTransferAmount, string? geminiInsights, string atm)
 		{
+			var total = values.Total;
 			var change = total - dayBeforeValue;
 			var changePct = dayBeforeValue != 0 ? Math.Round((change / dayBeforeValue) * 100, 2) : (decimal?)null;
 			var sign = change >= 0 ? "+" : "";
 			var embedColor = change >= 0 ? EmbedColorPositive : EmbedColorNegative;
 			var changeSinceYesterdayString = change >= 0 ? "📈 Change Since Yesterday" : "📉 Change Since Yesterday";
 
-			var portfolioValue = "```" + $"Saxo    {Dkk(saxoBalance),12} DKK\nNordnet {Dkk(stockValue),12} DKK\nJune    {Dkk(juneValue),12} DKK\n" + "```";
+			var portfolioValue = "```" + $"Saxo    {Dkk(values.Saxo),12} DKK\nNordnet {Dkk(values.Nordnet),12} DKK\nJune    {Dkk(values.June),12} DKK\n" + "```";
 			var changePctStr = changePct.HasValue ? $" ({sign}{changePct}%)" : "";
 			var changeValue = "```diff\n" + $"{sign}{Dkk(change)} DKK{changePctStr}" + "\n```";
 			if (lastTransferAmount.HasValue && lastTransferAmount.Value > 0)
 				changeValue += $"\n*⚠️ Inkluderer seneste indskud på {Dkk(lastTransferAmount.Value)} DKK*";
 
 			var distributionValue = total != 0
-				? "```" + $"Saxo    {Math.Round((saxoBalance / total) * 100, 1),6}%\nNordnet {Math.Round((stockValue / total) * 100, 1),6}%\nJune    {Math.Round((juneValue / total) * 100, 1),6}%" + "```"
+				? "```" + $"Saxo    {Math.Round((values.Saxo / total) * 100, 1),6}%\nNordnet {Math.Round((values.Nordnet / total) * 100, 1),6}%\nJune    {Math.Round((values.June / total) * 100, 1),6}%" + "```"
 				: "```N/A```";
 
 			var mainFields = new List<object>
