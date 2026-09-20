@@ -8,7 +8,6 @@ namespace StockPriceSheetPrintService.Service.Application
 		IConfiguration configuration,
 		ISaxoTokenService saxoTokenService,
 		ISaxoAccountService saxoAccountService,
-		IMarketStackService marketStackService,
 		IGoogleSheetsClient googleSheetsClient,
 		IPortfolioCalculator portfolioCalculator,
 		ISeenTransferStore seenTransferStore,
@@ -18,7 +17,6 @@ namespace StockPriceSheetPrintService.Service.Application
 		private readonly IConfiguration _configuration = configuration;
 		private readonly ISaxoTokenService _saxoTokenService = saxoTokenService;
 		private readonly ISaxoAccountService _saxoAccountService = saxoAccountService;
-		private readonly IMarketStackService _marketStackService = marketStackService;
 		private readonly IGoogleSheetsClient _googleSheetsClient = googleSheetsClient;
 		private readonly IPortfolioCalculator _portfolioCalculator = portfolioCalculator;
 		private readonly ISeenTransferStore _seenTransferStore = seenTransferStore;
@@ -56,14 +54,7 @@ namespace StockPriceSheetPrintService.Service.Application
 		{
 			try
 			{
-				var prices = await _marketStackService.GetStockPricesAsync(ctx, ct);
-				if (prices == null)
-				{
-					_logger.LogError("[FETCHER] Failed to get stock prices");
-					return 0m;
-				}
-
-				var stockValue = await _portfolioCalculator.CalculateTotalStockValueAsync(prices, ctx, ct);
+				var stockValue = await _portfolioCalculator.CalculateTotalStockValueAsync(ctx, ct);
 				var cash = await _nordnetStore.GetNordnetCashAmountAsync();
 				var totalNordnetValue = stockValue + cash.Amount;
 

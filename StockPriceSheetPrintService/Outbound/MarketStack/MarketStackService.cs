@@ -10,13 +10,11 @@ namespace StockPriceSheetPrintService.Outbound.MarketStack
 	public class MarketStackService(
 		IHttpClientFactory httpClientFactory,
 		IConfiguration configuration,
-		ILogger<MarketStackService> logger,
-		INordnetSymbolStore nordnetSymbolStore) : IMarketStackService
+		ILogger<MarketStackService> logger) : IMarketStackService
 	{
 		private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
 		private readonly IConfiguration _configuration = configuration;
 		private readonly ILogger<MarketStackService> _logger = logger;
-		private readonly INordnetSymbolStore _nordnetSymbolStore = nordnetSymbolStore;
 
 		private const string StockApiClientName = "StockApi";
 		private const string EodLatestEndpoint = "v2/eod/latest";
@@ -31,37 +29,34 @@ namespace StockPriceSheetPrintService.Outbound.MarketStack
 			Converters = { new FlexibleDateTimeOffsetConverter() }
 		};
 
-		public async Task<List<StockPrice>?> GetStockPricesAsync(ClientContext ctx, CancellationToken ct)
+		public async Task<StockPrice?> GetStockPriceAsync(string symbol, ClientContext ctx, CancellationToken ct)
 		{
 			var client = _httpClientFactory.CreateClient(StockApiClientName);
-			var nordnetSymbols = await _nordnetSymbolStore.GetSymbolsAsync();
-			var symbolsQuery = string.Join(",", nordnetSymbols.Keys);
-
-			var response = await GetStockPricesWithFallbackAsync(client, symbolsQuery, ct);
+			var response = await GetStockPricesWithFallbackAsync(client, symbol, ct);
 
 			if (!response.IsSuccessStatusCode)
 			{
-				_logger.LogError("[MARKETSTACK] Both API keys exhausted or API request failed. Status: {status}",
-					(int)response.StatusCode);
+				_logger.LogError("[MARKETSTACK] Both API keys exhausted or API request failed for {Symbol}. Status: {status}",
+					symbol, (int)response.StatusCode);
 				return null;
 			}
 
 			var json = await response.Content.ReadAsStringAsync(ct);
-			_logger.LogDebug("[MARKETSTACK] API response received successfully");
+			_logger.LogDebug("[MARKETSTACK] API response received successfully for {Symbol}", symbol);
 
 			try
 			{
 				var eodResponse = JsonSerializer.Deserialize<EodResponse>(json, JsonOptions);
 				if (eodResponse?.Data == null || eodResponse.Data.Count == 0)
 				{
-					_logger.LogError("[MARKETSTACK] Empty data in API response");
+					_logger.LogError("[MARKETSTACK] Empty data in API response for {Symbol}", symbol);
 					return null;
 				}
-				return EodMapper.ToStockPrices(eodResponse);
+				return EodMapper.ToStockPrice(eodResponse.Data[0]);
 			}
 			catch (JsonException ex)
 			{
-				_logger.LogError(ex, "[MARKETSTACK] Failed to deserialize API response");
+				_logger.LogError(ex, "[MARKETSTACK] Failed to deserialize API response for {Symbol}", symbol);
 				return null;
 			}
 		}

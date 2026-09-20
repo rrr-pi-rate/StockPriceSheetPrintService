@@ -4,6 +4,6 @@ namespace StockPriceSheetPrintService.Service.Ports.Outbound
 {
 	public interface IMarketStackService
 	{
-		Task<List<StockPrice>?> GetStockPricesAsync(ClientContext ctx, CancellationToken ct);
+		Task<StockPrice?> GetStockPriceAsync(string symbol, ClientContext ctx, CancellationToken ct);
 	}
 }
