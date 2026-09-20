@@ -58,14 +58,14 @@ namespace StockPriceSheetPrintService.Service.Application
 			_logger.LogInformation("[STARTUP] ✓ Initial token refresh completed");
 		}
 
-		private DateTimeOffset GetNextScheduledRunTime()
+		private DateTimeOffset GetNextScheduledRunTime() => SkipWeekends(GetNextRunTime(3, 30));
+
+		// Weekender og mandage (markedsdata fra fredag er allerede rapporteret) springes over.
+		internal static DateTimeOffset SkipWeekends(DateTimeOffset candidate)
 		{
-			var nextRunUtc = GetNextRunTime(3, 30);
-			while (nextRunUtc.DayOfWeek == DayOfWeek.Sunday || nextRunUtc.DayOfWeek == DayOfWeek.Monday)
-			{
-				nextRunUtc = nextRunUtc.AddDays(1);
-			}
-			return nextRunUtc;
+			while (candidate.DayOfWeek is DayOfWeek.Sunday or DayOfWeek.Monday)
+				candidate = candidate.AddDays(1);
+			return candidate;
 		}
 
 		private async Task WaitUntilNextRunAsync(DateTimeOffset nextRunUtc, CancellationToken stoppingToken)
@@ -92,7 +92,7 @@ namespace StockPriceSheetPrintService.Service.Application
 				await Task.Delay(finalDelay, stoppingToken);
 		}
 
-		private async Task RunScheduledJobAsync(CancellationToken stoppingToken)
+		internal async Task RunScheduledJobAsync(CancellationToken stoppingToken)
 		{
 			try
 			{
