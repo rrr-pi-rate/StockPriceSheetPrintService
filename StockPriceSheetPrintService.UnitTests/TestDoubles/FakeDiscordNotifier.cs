@@ -7,6 +7,8 @@ namespace StockPriceSheetPrintService.UnitTests.TestDoubles
 	{
 		public int LoginUrlSentCount { get; private set; }
 		public string? LastLoginUrl { get; private set; }
+		public int MorningReportSentCount { get; private set; }
+		public PortfolioValues? LastMorningReportValues { get; private set; }
 
 		public Task SendLoginUrlAsync(string loginUrl, CancellationToken stoppingToken)
 		{
@@ -15,7 +17,11 @@ namespace StockPriceSheetPrintService.UnitTests.TestDoubles
 			return Task.CompletedTask;
 		}
 
-		public Task SendMorningReportAsync(PortfolioValues values, decimal dayBeforeValue, decimal? lastTransferAmount, string? geminiInsights, string atm, CancellationToken stoppingToken) =>
-			Task.CompletedTask;
+		public Task SendMorningReportAsync(PortfolioValues values, decimal dayBeforeValue, decimal? lastTransferAmount, string? geminiInsights, string atm, CancellationToken stoppingToken)
+		{
+			MorningReportSentCount++;
+			LastMorningReportValues = values;
+			return Task.CompletedTask;
+		}
 	}
 }
