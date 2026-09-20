@@ -1,10 +1,7 @@
 namespace StockPriceSheetPrintService.Service.Models
 {
 	public record ScheduledReport(
-		decimal SaxoBalance,
-		decimal NordnetValue,
-		decimal JuneValue,
-		decimal Total,
+		PortfolioValues Values,
 		decimal PreviousDayValue,
 		decimal? TransferAmount,
 		string? GeminiInsights,

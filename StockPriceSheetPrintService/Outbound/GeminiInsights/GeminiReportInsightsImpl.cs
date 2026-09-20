@@ -20,10 +20,7 @@ namespace StockPriceSheetPrintService.Outbound.GeminiInsights
 		};
 
 		public async Task<string?> GetInsightsAsync(
-			decimal saxoBalance,
-			decimal nordnetValue,
-			decimal juneValue,
-			decimal total,
+			PortfolioValues values,
 			decimal previousDayValue,
 			List<Transfer> newTransfers,
 			List<string> nordnetTickers,
@@ -31,7 +28,7 @@ namespace StockPriceSheetPrintService.Outbound.GeminiInsights
 			ClientContext ctx,
 			CancellationToken ct)
 		{
-			var change = total - previousDayValue;
+			var change = values.Total - previousDayValue;
 			var changePct = previousDayValue != 0 ? Math.Round((change / previousDayValue) * 100, 2) : 0;
 			var sign = change >= 0 ? "+" : "";
 
@@ -53,10 +50,10 @@ namespace StockPriceSheetPrintService.Outbound.GeminiInsights
 var userPrompt =
     $"Dagens dato: {yesterdaysDate}\n\n" +
     $"Porteføljeværdier:\n" +
-    $"  Saxo: {saxoBalance:N2} DKK\n" +
-    $"  Nordnet: {nordnetValue:N2} DKK\n" +
-    $"  June (Danske Invest): {juneValue:N2} DKK\n" +
-    $"  Total: {total:N2} DKK\n" +
+    $"  Saxo: {values.Saxo:N2} DKK\n" +
+    $"  Nordnet: {values.Nordnet:N2} DKK\n" +
+    $"  June (Danske Invest): {values.June:N2} DKK\n" +
+    $"  Total: {values.Total:N2} DKK\n" +
     $"  Ændring siden i går: {sign}{change:N2} DKK ({sign}{changePct}%)\n\n" +
     $"Saxo-beholdning:\n{saxoPositionsText}\n\n" +
     $"Nordnet-tickers: {nordnetTickersText}\n\n" +

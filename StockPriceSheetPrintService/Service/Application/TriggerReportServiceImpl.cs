@@ -14,8 +14,7 @@ namespace StockPriceSheetPrintService.Service.Application
 			if (report is null) return false;
 
 			await _discordNotifier.SendMorningReportAsync(
-				report.SaxoBalance, report.NordnetValue, report.JuneValue,
-				report.Total, report.PreviousDayValue, report.TransferAmount,
+				report.Values, report.PreviousDayValue, report.TransferAmount,
 				report.GeminiInsights, report.Atm, ct);
 
 			_pendingReportStore.Clear();

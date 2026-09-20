@@ -1,3 +1,4 @@
+using StockPriceSheetPrintService.Service.Models;
 using StockPriceSheetPrintService.Service.Ports.Inbound;
 using StockPriceSheetPrintService.Service.Ports.Outbound;
 
@@ -46,23 +47,19 @@ namespace StockPriceSheetPrintService.Service.Application
 
 				await Task.WhenAll(saxoBalanceTask, nordnetValueTask, juneValueTask, transfersTask, previousDayValueTask, netPositionsTask, atmTask);
 
-				var saxoBalance = saxoBalanceTask.Result;
-				var nordnetValue = nordnetValueTask.Result;
-				var juneValue = juneValueTask.Result;
+				var values = new PortfolioValues(saxoBalanceTask.Result, nordnetValueTask.Result, juneValueTask.Result);
 				var newTransfers = transfersTask.Result;
 				var previousDayValue = previousDayValueTask.Result;
 				var saxoPositions = netPositionsTask.Result;
 				var atm = atmTask.Result;
 
-				var total = saxoBalance + nordnetValue + juneValue;
-
 				_logger.LogInformation("[JOB] ✓ Portfolio values fetched");
 				_logger.LogInformation("[JOB]   Saxo: {saxo:F2} | Nordnet: {nordnet:F2} | June: {june:F2} | Total: {total:F2}",
-					saxoBalance, nordnetValue, juneValue, total);
+					values.Saxo, values.Nordnet, values.June, values.Total);
 
 				// Update Google Sheets
 				_logger.LogInformation("[JOB] [2/4] Updating Google Sheets...");
-				await _reporter.UpdateGoogleSheetsAsync(total, ctx, ct);
+				await _reporter.UpdateGoogleSheetsAsync(values, ctx, ct);
 				_executionGuard.LogExecution();
 
 				// Get morning report insights from Gemini
@@ -72,7 +69,7 @@ namespace StockPriceSheetPrintService.Service.Application
 					_logger.LogInformation("[JOB] [3/4] Getting morning report insights from Gemini...");
 					var nordnetSymbols = await _nordnetSymbolStore.GetSymbolsAsync();
 					var nordnetTickers = nordnetSymbols.Keys.ToList();
-					insights = await _geminiInsights.GetInsightsAsync(saxoBalance, nordnetValue, juneValue, total, previousDayValue, newTransfers, nordnetTickers, saxoPositions, ctx, ct);
+					insights = await _geminiInsights.GetInsightsAsync(values, previousDayValue, newTransfers, nordnetTickers, saxoPositions, ctx, ct);
 				}
 				else
 				{
@@ -81,9 +78,9 @@ namespace StockPriceSheetPrintService.Service.Application
 
 				// Report results
 				_logger.LogInformation("[JOB] [4/4] Reporting results...");
-				await _reporter.ReportMorningAsync(saxoBalance, nordnetValue, juneValue, total, previousDayValue, newTransfers, sendDiscordImmediately, insights, atm, ctx, ct);
+				await _reporter.ReportMorningAsync(values, previousDayValue, newTransfers, sendDiscordImmediately, insights, atm, ctx, ct);
 
-				LogJobCompleted(total);
+				LogJobCompleted(values.Total);
 			}
 			catch (Exception ex)
 			{
