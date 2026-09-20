@@ -19,6 +19,24 @@ namespace StockPriceSheetPrintService.Outbound.GeminiInsights
 			]
 		};
 
+		internal static string BuildUserPrompt(PortfolioValues values, decimal previousDayValue, string yesterdaysDate, string saxoPositionsText, string nordnetTickersText, string transfersText)
+		{
+			var change = values.Total - previousDayValue;
+			var changePct = previousDayValue != 0 ? Math.Round((change / previousDayValue) * 100, 2) : 0;
+			var sign = change >= 0 ? "+" : "";
+
+			return $"Dagens dato: {yesterdaysDate}\n\n" +
+				$"Porteføljeværdier:\n" +
+				$"  Saxo: {values.Saxo:N2} DKK\n" +
+				$"  Nordnet: {values.Nordnet:N2} DKK\n" +
+				$"  June (Danske Invest): {values.June:N2} DKK\n" +
+				$"  Total: {values.Total:N2} DKK\n" +
+				$"  Ændring siden i går: {sign}{change:N2} DKK ({sign}{changePct}%)\n\n" +
+				$"Saxo-beholdning:\n{saxoPositionsText}\n\n" +
+				$"Nordnet-tickers: {nordnetTickersText}\n\n" +
+				$"{transfersText}";
+		}
+
 		public async Task<string?> GetInsightsAsync(
 			PortfolioValues values,
 			decimal previousDayValue,
@@ -28,10 +46,6 @@ namespace StockPriceSheetPrintService.Outbound.GeminiInsights
 			ClientContext ctx,
 			CancellationToken ct)
 		{
-			var change = values.Total - previousDayValue;
-			var changePct = previousDayValue != 0 ? Math.Round((change / previousDayValue) * 100, 2) : 0;
-			var sign = change >= 0 ? "+" : "";
-
 			var transfersText = newTransfers.Count > 0
 				? $"Nye overførsler: {string.Join(", ", newTransfers.Select(t => $"{t.Amount:N2} DKK"))}"
 				: "Ingen nye overførsler";
@@ -47,17 +61,7 @@ namespace StockPriceSheetPrintService.Outbound.GeminiInsights
 
 			var yesterdaysDate = DateTime.Now.AddDays(-1).ToString("dd-MM-yyyy");
 
-var userPrompt =
-    $"Dagens dato: {yesterdaysDate}\n\n" +
-    $"Porteføljeværdier:\n" +
-    $"  Saxo: {values.Saxo:N2} DKK\n" +
-    $"  Nordnet: {values.Nordnet:N2} DKK\n" +
-    $"  June (Danske Invest): {values.June:N2} DKK\n" +
-    $"  Total: {values.Total:N2} DKK\n" +
-    $"  Ændring siden i går: {sign}{change:N2} DKK ({sign}{changePct}%)\n\n" +
-    $"Saxo-beholdning:\n{saxoPositionsText}\n\n" +
-    $"Nordnet-tickers: {nordnetTickersText}\n\n" +
-    $"{transfersText}";
+			var userPrompt = BuildUserPrompt(values, previousDayValue, yesterdaysDate, saxoPositionsText, nordnetTickersText, transfersText);
 
 			string basePrompt =
     "Du er en finansiel analytiker. Din opgave er at forklare dagens bevægelser i en portefølje.\n\n" +
