@@ -51,8 +51,6 @@ namespace StockPriceSheetPrintService.Inbound.Controllers
 				return Ok(new
 				{
 					Message = "Everything is set up! Your worker will now run automatically.",
-					Værdi = result.TotalValue,
-					Valuta = result.Currency,
 					NextRunTime = "Check logs for next scheduled run"
 				});
 			}
