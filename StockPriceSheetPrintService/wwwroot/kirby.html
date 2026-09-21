@@ -351,6 +351,53 @@
                 background: var(--jyske-mid);
             }
 
+        /* ---- Kirby LoadingOverlay (showBackdrop: true, hideContent: false) ---- */
+        .loading-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(244, 246, 245, 0.8);
+            transition: opacity 0.2s ease;
+        }
+
+            .loading-overlay.hidden {
+                opacity: 0;
+                pointer-events: none;
+            }
+
+        .loading-spinner {
+            position: relative;
+            width: 32px;
+            height: 32px;
+        }
+
+            .loading-spinner .inner-circle,
+            .loading-spinner .outer-circle {
+                position: absolute;
+                inset: 0;
+                border-radius: 50%;
+                background: var(--jyske-accent);
+                opacity: 0.6;
+                animation: kirby-spinner-bounce 2s infinite ease-in-out;
+            }
+
+            .loading-spinner .outer-circle {
+                animation-delay: -1s;
+            }
+
+        @keyframes kirby-spinner-bounce {
+            0%, 100% {
+                transform: scale(0);
+            }
+
+            50% {
+                transform: scale(1);
+            }
+        }
+
         @media (max-width: 600px) {
             .topbar {
                 padding: 1.1rem 1rem;
@@ -393,6 +440,14 @@
     </style>
 </head>
 <body>
+    <div class="loading-overlay" id="loadingOverlay" role="status" aria-live="polite">
+        <div class="loading-spinner">
+            <span class="inner-circle"></span>
+            <span class="outer-circle"></span>
+        </div>
+        <span class="visually-hidden">Indlæser porteføljedata…</span>
+    </div>
+
     <div class="topbar">
         <p class="eyebrow">Saxo · Nordnet · June</p>
         <h1>Portfolio Dashboard</h1>
@@ -792,6 +847,8 @@
                 const el = document.getElementById("error");
                 el.textContent = "Kunne ikke hente data: " + e.message;
                 el.style.display = "block";
+            } finally {
+                document.getElementById("loadingOverlay").classList.add("hidden");
             }
         }
 
