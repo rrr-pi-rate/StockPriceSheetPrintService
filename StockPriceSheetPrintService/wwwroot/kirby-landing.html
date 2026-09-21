@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Portefølje Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --jyske-primary: #005c3c;
+            --jyske-dark: #01352c;
+            --jyske-mid: #136a58;
+            --jyske-accent: #00a976;
+            --jyske-bright: #20c598;
+        }
+
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html, body {
+            min-height: 100vh;
+        }
+
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(160deg, var(--jyske-dark) 0%, var(--jyske-primary) 55%, var(--jyske-mid) 100%);
+            font-family: 'Roboto', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            color: #ffffff;
+            padding: 1.5rem;
+        }
+
+        .splash {
+            width: 100%;
+            max-width: 380px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            text-align: center;
+        }
+
+        .mark {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.12);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 900;
+            font-size: 1.2rem;
+            letter-spacing: 0.02em;
+            margin-bottom: 1.25rem;
+        }
+
+        .eyebrow {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: rgba(255, 255, 255, 0.65);
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            margin-bottom: 0.5rem;
+        }
+
+        h1 {
+            font-size: 2rem;
+            font-weight: 900;
+            letter-spacing: -0.01em;
+            margin-bottom: 0.6rem;
+        }
+
+        .subtitle {
+            font-size: 0.95rem;
+            color: rgba(255, 255, 255, 0.75);
+            font-weight: 400;
+            margin-bottom: 3rem;
+        }
+
+        .slider {
+            position: relative;
+            width: 100%;
+            height: 60px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.14);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            overflow: hidden;
+            touch-action: none;
+            user-select: none;
+        }
+
+        .slider-fill {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            width: 30px;
+            background: linear-gradient(90deg, var(--jyske-accent), var(--jyske-bright));
+            border-radius: 999px;
+        }
+
+        .slider-label {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.85rem;
+            font-weight: 600;
+            letter-spacing: 0.02em;
+            color: rgba(255, 255, 255, 0.92);
+            pointer-events: none;
+        }
+
+        .slider-thumb {
+            position: absolute;
+            top: 4px;
+            left: 4px;
+            width: 52px;
+            height: 52px;
+            border-radius: 50%;
+            background: #ffffff;
+            color: var(--jyske-primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 8px rgba(1, 53, 44, 0.35);
+            cursor: grab;
+            touch-action: none;
+        }
+
+            .slider-thumb:active {
+                cursor: grabbing;
+            }
+
+            .slider-thumb:focus-visible {
+                outline: 2px solid #ffffff;
+                outline-offset: 2px;
+            }
+
+            .slider-thumb svg {
+                width: 20px;
+                height: 20px;
+            }
+
+        .footnote {
+            margin-top: 1.5rem;
+            font-size: 0.75rem;
+            color: rgba(255, 255, 255, 0.55);
+        }
+
+        @media (max-width: 420px) {
+            h1 {
+                font-size: 1.6rem;
+            }
+
+            .subtitle {
+                margin-bottom: 2.25rem;
+            }
+
+            .slider {
+                height: 56px;
+            }
+
+            .slider-thumb {
+                width: 48px;
+                height: 48px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="splash">
+        <div class="mark">PD</div>
+        <p class="eyebrow">Saxo · Nordnet · June</p>
+        <h1>Portefølje Dashboard</h1>
+        <p class="subtitle">Din daglige formueoversigt</p>
+
+        <div class="slider" id="slider">
+            <div class="slider-fill" id="sliderFill"></div>
+            <span class="slider-label" id="sliderLabel">Slide for at åbne dashboard</span>
+            <div class="slider-thumb" id="sliderThumb" role="button" tabindex="0" aria-label="Slide for at åbne dashboard">
+                <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M9 6l6 6-6 6" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+            </div>
+        </div>
+
+        <p class="footnote">Opdateres automatisk hver morgen kl. 07:00</p>
+    </div>
+
+    <script>
+        (function () {
+            const slider = document.getElementById("slider");
+            const fill = document.getElementById("sliderFill");
+            const label = document.getElementById("sliderLabel");
+            const thumb = document.getElementById("sliderThumb");
+
+            const thumbSize = 52;
+            const trackPadding = 4;
+            let maxLeft = 0;
+            let dragging = false;
+            let moved = false;
+            let unlocked = false;
+            let startX = 0;
+            let startLeft = 0;
+
+            function computeMaxLeft() {
+                maxLeft = Math.max(0, slider.clientWidth - thumbSize - trackPadding * 2);
+            }
+
+            function setPosition(left, withTransition) {
+                thumb.style.transition = withTransition ? "left .25s ease" : "none";
+                fill.style.transition = withTransition ? "width .25s ease" : "none";
+                thumb.style.left = (trackPadding + left) + "px";
+                fill.style.width = (trackPadding + left + thumbSize / 2) + "px";
+                const progress = maxLeft > 0 ? left / maxLeft : 0;
+                label.style.opacity = String(Math.max(0, 1 - progress * 1.4));
+            }
+
+            function reset() {
+                setPosition(0, true);
+            }
+
+            function complete() {
+                if (unlocked) return;
+                unlocked = true;
+                setPosition(maxLeft, true);
+                label.textContent = "Åbner dashboard …";
+                label.style.opacity = "1";
+                thumb.setAttribute("aria-disabled", "true");
+                setTimeout(() => {
+                    window.location.href = "kirby.html";
+                }, 300);
+            }
+
+            function currentLeft() {
+                return parseFloat(thumb.style.left || trackPadding) - trackPadding;
+            }
+
+            function onPointerDown(e) {
+                if (unlocked) return;
+                dragging = true;
+                moved = false;
+                startX = e.clientX;
+                startLeft = currentLeft();
+            }
+
+            function onPointerMove(e) {
+                if (!dragging || unlocked) return;
+                const dx = e.clientX - startX;
+                if (Math.abs(dx) > 4) moved = true;
+                const left = Math.min(maxLeft, Math.max(0, startLeft + dx));
+                setPosition(left, false);
+            }
+
+            function onPointerUp() {
+                if (!dragging || unlocked) return;
+                dragging = false;
+
+                if (!moved) {
+                    complete();
+                    return;
+                }
+
+                if (maxLeft > 0 && currentLeft() / maxLeft >= 0.85) {
+                    complete();
+                } else {
+                    reset();
+                }
+            }
+
+            computeMaxLeft();
+            setPosition(0, false);
+            window.addEventListener("resize", computeMaxLeft);
+
+            thumb.addEventListener("pointerdown", onPointerDown);
+            window.addEventListener("pointermove", onPointerMove);
+            window.addEventListener("pointerup", onPointerUp);
+
+            thumb.addEventListener("keydown", e => {
+                if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    complete();
+                }
+            });
+        })();
+    </script>
+</body>
+</html>
