@@ -467,7 +467,7 @@
                             </svg>
                         </button>
                         <div class="kirby-dropdown-panel" id="benchmarkListbox" role="listbox" aria-labelledby="benchmarkDropdownBtn" hidden></div>
-                        <select id="benchmarkSelect" class="visually-hidden" tabindex="-1" aria-hidden="true">
+                        <select id="benchmarkSelect" class="visually-hidden" tabindex="-1" aria-hidden="true" label="Benchmark">
                             <option value="msci">MSCI World (~10% p.a.)</option>
                             <option value="sp500">S&P 500 (~11% p.a.)</option>
                             <option value="omxc25">OMXC25 (~8% p.a.)</option>
@@ -799,7 +799,7 @@
             btn.addEventListener("click", () => {
                 document.querySelectorAll(".period-buttons button").forEach(b => b.classList.remove("active"));
                 btn.classList.add("active");
-                filterAndRender(btn.dataset.days === "ytd" ? "ytd" : parseInt(btn.dataset.days, 10));
+                filterAndRender(btn.dataset.days === "ytd" ? "ytd" : Number.parseInt(btn.dataset.days, 10));
             });
         });
 

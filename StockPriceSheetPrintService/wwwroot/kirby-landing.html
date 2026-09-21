@@ -241,7 +241,7 @@
             }
 
             function currentLeft() {
-                return parseFloat(thumb.style.left || trackPadding) - trackPadding;
+                return Number.parseFloat(thumb.style.left || trackPadding) - trackPadding;
             }
 
             function onPointerDown(e) {
