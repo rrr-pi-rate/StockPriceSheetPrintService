@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Serilog.Context;
+using StockPriceSheetPrintService.Inbound.Dto;
 using StockPriceSheetPrintService.Inbound.Filters;
 using StockPriceSheetPrintService.Service;
 using StockPriceSheetPrintService.Service.Ports.Inbound;
@@ -24,6 +25,7 @@ namespace StockPriceSheetPrintService.Inbound.Controllers
 		}
 
 		[HttpGet("login")]
+		[ProducesResponseType(typeof(string), StatusCodes.Status200OK, "text/plain")]
 		public async Task<IActionResult> GetLoginUrl(CancellationToken ct)
 		{
 			var ctx = ClientContextFactory.New("HTTP:login");
@@ -34,6 +36,9 @@ namespace StockPriceSheetPrintService.Inbound.Controllers
 		}
 
 		[HttpGet("callback")]
+		[ProducesResponseType(typeof(CallbackSuccessResponseDto), StatusCodes.Status200OK)]
+		[ProducesResponseType(typeof(string), StatusCodes.Status400BadRequest)]
+		[ProducesResponseType(typeof(string), StatusCodes.Status500InternalServerError)]
 		public async Task<IActionResult> Callback([FromQuery] string code, CancellationToken ct)
 		{
 			var ctx = ClientContextFactory.New("HTTP:callback");
@@ -48,11 +53,9 @@ namespace StockPriceSheetPrintService.Inbound.Controllers
 			try
 			{
 				var result = await _saxoManagementService.HandleCallbackAsync(code, ctx, ct);
-				return Ok(new
-				{
-					Message = "Everything is set up! Your worker will now run automatically.",
-					NextRunTime = "Check logs for next scheduled run"
-				});
+				return Ok(new CallbackSuccessResponseDto(
+					"Everything is set up! Your worker will now run automatically.",
+					"Check logs for next scheduled run"));
 			}
 			catch (Exception ex)
 			{
@@ -63,29 +66,34 @@ namespace StockPriceSheetPrintService.Inbound.Controllers
 
 		[AdminApiKeyFilter]
 		[HttpPost("trigger")]
+		[ProducesResponseType(typeof(MessageResponseDto), StatusCodes.Status200OK)]
 		public async Task<IActionResult> TriggerJob(CancellationToken ct)
 		{
 			var ctx = ClientContextFactory.New("HTTP:trigger");
 			using var _1 = LogContext.PushProperty("CorrelationId", ctx.CorrelationId);
 			using var _2 = LogContext.PushProperty("Source", ctx.Source);
 			await _jobRunner.RunJobAsync(ctx, ct, true);
-			return Ok(new { Message = "Job completed." });
+			return Ok(new MessageResponseDto("Job completed."));
 		}
 
 		[AdminApiKeyFilter]
 		[HttpPost("refreshToken")]
+		[ProducesResponseType(typeof(MessageResponseDto), StatusCodes.Status200OK)]
+		[ProducesResponseType(typeof(MessageResponseDto), StatusCodes.Status404NotFound)]
 		public async Task<IActionResult> RefreshSaxoAccessTokenAsync(CancellationToken ct)
 		{
 			var ctx = ClientContextFactory.New("HTTP:refreshToken");
 			using var _1 = LogContext.PushProperty("CorrelationId", ctx.CorrelationId);
 			using var _2 = LogContext.PushProperty("Source", ctx.Source);
 			var accessToken = await _saxoManagementService.GetOrRefreshAccessTokenAsync(ctx, ct);
-			if (accessToken == null) return NotFound(new { Message = "No valid access token found. Log in via /saxo/login" });
-			return Ok(new { Message = "Token refresh completed." });
+			if (accessToken == null) return NotFound(new MessageResponseDto("No valid access token found. Log in via /saxo/login"));
+			return Ok(new MessageResponseDto("Token refresh completed."));
 		}
 
 		[AdminApiKeyFilter]
 		[HttpPost("getAccessToken")]
+		[ProducesResponseType(typeof(AccessTokenResponseDto), StatusCodes.Status200OK)]
+		[ProducesResponseType(typeof(MessageResponseDto), StatusCodes.Status404NotFound)]
 		public async Task<IActionResult> GetAccessTokenAsync(CancellationToken ct)
 		{
 			var ctx = ClientContextFactory.New("HTTP:getAccessToken");
@@ -93,8 +101,8 @@ namespace StockPriceSheetPrintService.Inbound.Controllers
 			using var _2 = LogContext.PushProperty("Source", ctx.Source);
 			var accessToken = await _saxoManagementService.GetOrRefreshAccessTokenAsync(ctx, ct);
 			if (accessToken == null)
-				return NotFound(new { Message = "No valid access token found. Log in via /saxo/login" });
-			return Ok(new { AccessToken = accessToken });
+				return NotFound(new MessageResponseDto("No valid access token found. Log in via /saxo/login"));
+			return Ok(new AccessTokenResponseDto(accessToken));
 		}
 	}
 }
