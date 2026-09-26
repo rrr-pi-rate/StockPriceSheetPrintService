@@ -18,7 +18,8 @@ namespace StockPriceSheetPrintService.UnitTests
 			FakeYahooFinanceClinet YahooClient,
 			FakeBenchmarkStore BenchmarkStore,
 			FakeHistoricalExchangeRateProvider ExchangeRateProvider,
-			FakeExchangeRateStore ExchangeRateStore);
+			FakeExchangeRateStore ExchangeRateStore,
+			TestLogger<DashboardServiceImpl> Logger);
 
 		private static Fixture CreateService(bool withSheetsKey = true)
 		{
@@ -33,6 +34,7 @@ namespace StockPriceSheetPrintService.UnitTests
 			var benchmarkStore = new FakeBenchmarkStore();
 			var exchangeRateProvider = new FakeHistoricalExchangeRateProvider();
 			var exchangeRateStore = new FakeExchangeRateStore();
+			var logger = new TestLogger<DashboardServiceImpl>();
 
 			var service = new DashboardServiceImpl(
 				Options.Create(new BenchmarkOptions { PortfolioStartDate = PortfolioStartDate }),
@@ -41,9 +43,10 @@ namespace StockPriceSheetPrintService.UnitTests
 				benchmarkStore,
 				exchangeRateProvider,
 				exchangeRateStore,
-				configuration);
+				configuration,
+				logger);
 
-			return new Fixture(service, googleSheetsClient, yahooClient, benchmarkStore, exchangeRateProvider, exchangeRateStore);
+			return new Fixture(service, googleSheetsClient, yahooClient, benchmarkStore, exchangeRateProvider, exchangeRateStore, logger);
 		}
 
 		[Fact]
@@ -61,23 +64,37 @@ namespace StockPriceSheetPrintService.UnitTests
 		}
 
 		[Fact]
-		public async Task GetBenchmarkDataAsync_ConvertsToDkk_UsingRateFromProvider_AndCachesIt()
+		public async Task GetBenchmarkDataAsync_ConvertsToDkk_UsingRateFromProvider_AndCachesIt_InOneBatch()
 		{
 			var fixture = CreateService();
-			var date = new DateTime(2026, 1, 2);
+			var date1 = new DateTime(2026, 1, 2);
+			var date2 = new DateTime(2026, 1, 5);
 			fixture.BenchmarkStore.LatestDateToReturn = null;
-			fixture.YahooClient.BenchmarkQuoteToReturn = new BenchmarkQuote("USD", [new BenchmarkDataPoint(date, 4000.0)]);
-			fixture.ExchangeRateProvider.RatesToReturn[("USD", DateOnly.FromDateTime(date))] = 6.83m;
+			fixture.YahooClient.BenchmarkQuoteToReturn = new BenchmarkQuote("USD", [
+				new BenchmarkDataPoint(date1, 4000.0),
+				new BenchmarkDataPoint(date2, 4100.0),
+			]);
+			fixture.ExchangeRateProvider.RatesToReturn[("USD", DateOnly.FromDateTime(date1))] = 6.83m;
+			fixture.ExchangeRateProvider.RatesToReturn[("USD", DateOnly.FromDateTime(date2))] = 6.90m;
 
 			await fixture.Service.GetBenchmarkDataAsync("^GSPC", Ctx, CancellationToken.None);
 
-			var inserted = Assert.Single(fixture.BenchmarkStore.LastInsertedPoints!);
-			Assert.Equal(4000.0 * 6.83, inserted.Value, precision: 5);
-			Assert.Contains(fixture.ExchangeRateStore.InsertedRates, r => r.Currency == "USD" && r.Rate == 6.83m);
+			var inserted = fixture.BenchmarkStore.LastInsertedPoints!;
+			Assert.Equal(2, inserted.Count);
+			Assert.Equal(4000.0 * 6.83, inserted[0].Value, precision: 5);
+			Assert.Equal(4100.0 * 6.90, inserted[1].Value, precision: 5);
+
+			var call = Assert.Single(fixture.ExchangeRateProvider.Calls);
+			Assert.Equal("USD", call.Currency);
+			Assert.Equal(DateOnly.FromDateTime(date1), call.From);
+			Assert.Equal(DateOnly.FromDateTime(date2), call.To);
+
+			var insertedRange = Assert.Single(fixture.ExchangeRateStore.InsertedRanges);
+			Assert.Equal(2, insertedRange.Rates.Count);
 		}
 
 		[Fact]
-		public async Task GetBenchmarkDataAsync_UsesCachedRate_WithoutCallingProviderAgain()
+		public async Task GetBenchmarkDataAsync_UsesCachedRates_WithoutCallingProviderAgain()
 		{
 			var fixture = CreateService();
 			var date = new DateTime(2026, 1, 2);
@@ -94,7 +111,7 @@ namespace StockPriceSheetPrintService.UnitTests
 		}
 
 		[Fact]
-		public async Task GetBenchmarkDataAsync_FallsBackToRateOne_AndCachesIt_WhenProviderHasNoRate()
+		public async Task GetBenchmarkDataAsync_FallsBackToRateOne_WithoutCachingIt_AndLogsWarning_WhenNoRateIsFound()
 		{
 			var fixture = CreateService();
 			var date = new DateTime(2026, 1, 2);
@@ -105,7 +122,8 @@ namespace StockPriceSheetPrintService.UnitTests
 
 			var inserted = Assert.Single(fixture.BenchmarkStore.LastInsertedPoints!);
 			Assert.Equal(4000.0, inserted.Value, precision: 5);
-			Assert.Contains(fixture.ExchangeRateStore.InsertedRates, r => r.Currency == "USD" && r.Rate == 1m);
+			Assert.Empty(fixture.ExchangeRateStore.InsertedRanges);
+			Assert.Contains(fixture.Logger.Messages, m => m.Contains("USD") && m.Contains("^GSPC"));
 		}
 
 		[Fact]
@@ -119,7 +137,7 @@ namespace StockPriceSheetPrintService.UnitTests
 			await fixture.Service.GetBenchmarkDataAsync("OMXC25", Ctx, CancellationToken.None);
 
 			Assert.Empty(fixture.ExchangeRateProvider.Calls);
-			Assert.Empty(fixture.ExchangeRateStore.InsertedRates);
+			Assert.Empty(fixture.ExchangeRateStore.InsertedRanges);
 			var inserted = Assert.Single(fixture.BenchmarkStore.LastInsertedPoints!);
 			Assert.Equal(100.0, inserted.Value);
 		}

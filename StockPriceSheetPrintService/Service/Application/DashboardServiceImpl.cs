@@ -12,7 +12,8 @@ namespace StockPriceSheetPrintService.Service.Application
 		IBenchmarkStore repository,
 		IHistoricalExchangeRateProvider exchangeRateProvider,
 		IExchangeRateStore exchangeRateStore,
-		IConfiguration configuration) : IDashboardService
+		IConfiguration configuration,
+		ILogger<DashboardServiceImpl> logger) : IDashboardService
 	{
 		private static readonly Dictionary<string, (string RateCurrency, decimal Divisor)> CurrencyAliases = new()
 		{
@@ -32,40 +33,58 @@ namespace StockPriceSheetPrintService.Service.Application
 				var quote = await yahooClient.GetBenchmarkDataAsync(
 					symbol, fetchFrom.ToDateTime(TimeOnly.MinValue), yesterday.ToDateTime(TimeOnly.MinValue), ctx, ct);
 
-				var dkkPoints = await ConvertToDkkAsync(quote, ctx, ct);
+				var dkkPoints = await ConvertToDkkAsync(symbol, quote, ctx, ct);
 				await repository.InsertAsync(symbol, dkkPoints, ct);
 			}
 
 			return await repository.GetCachedDataAsync(symbol, ct);
 		}
 
-		private async Task<IReadOnlyList<BenchmarkDataPoint>> ConvertToDkkAsync(BenchmarkQuote quote, ClientContext ctx, CancellationToken ct)
+		private async Task<IReadOnlyList<BenchmarkDataPoint>> ConvertToDkkAsync(string symbol, BenchmarkQuote quote, ClientContext ctx, CancellationToken ct)
 		{
 			if (quote.Points.Count == 0 || string.IsNullOrEmpty(quote.Currency) || quote.Currency == "DKK")
 				return quote.Points;
 
 			var (rateCurrency, divisor) = CurrencyAliases.TryGetValue(quote.Currency, out var alias) ? alias : (quote.Currency, 1m);
 
+			var rates = await GetRatesToDkkAsync(rateCurrency, quote.Points, ctx, ct);
+
 			var converted = new List<BenchmarkDataPoint>(quote.Points.Count);
 			foreach (var point in quote.Points)
 			{
 				var date = DateOnly.FromDateTime(point.Date);
-				var rate = await GetRateToDkkAsync(rateCurrency, date, ctx, ct);
+				if (!rates.TryGetValue(date, out var rate))
+				{
+					rate = 1m;
+					logger.LogWarning("[EXCHANGE-RATE] No DKK rate found for {Currency} on {Date} for symbol {Symbol} - falling back to 1:1 - ClientContext {ctx}", rateCurrency, date, symbol, ctx);
+				}
+
 				converted.Add(new BenchmarkDataPoint(point.Date, point.Value / (double)divisor * (double)rate));
 			}
 
 			return converted;
 		}
 
-		private async Task<decimal> GetRateToDkkAsync(string currency, DateOnly date, ClientContext ctx, CancellationToken ct)
+		private async Task<Dictionary<DateOnly, decimal>> GetRatesToDkkAsync(string currency, IReadOnlyList<BenchmarkDataPoint> points, ClientContext ctx, CancellationToken ct)
 		{
-			var cachedRate = await exchangeRateStore.GetCachedRateAsync(currency, date, ct);
-			if (cachedRate is not null)
-				return cachedRate.Value;
+			var dates = points.Select(p => DateOnly.FromDateTime(p.Date)).Distinct().ToList();
+			var rangeFrom = dates.Min();
+			var rangeTo = dates.Max();
 
-			var rate = await exchangeRateProvider.GetRateToDkkAsync(currency, date, ctx, ct) ?? 1m;
-			await exchangeRateStore.InsertAsync(currency, date, rate, ct);
-			return rate;
+			var rates = await exchangeRateStore.GetCachedRatesAsync(currency, rangeFrom, rangeTo, ct);
+			if (dates.All(rates.ContainsKey))
+				return rates;
+
+			var fetched = await exchangeRateProvider.GetRatesToDkkAsync(currency, rangeFrom, rangeTo, ctx, ct);
+			var newRates = fetched.Where(kv => !rates.ContainsKey(kv.Key)).ToDictionary(kv => kv.Key, kv => kv.Value);
+
+			if (newRates.Count > 0)
+				await exchangeRateStore.InsertRangeAsync(currency, newRates, ct);
+
+			foreach (var (date, rate) in newRates)
+				rates[date] = rate;
+
+			return rates;
 		}
 
 		public Task<List<(DateOnly Date, decimal Value)>> GetHistoricalDataAsync(ClientContext ctx, CancellationToken ct)

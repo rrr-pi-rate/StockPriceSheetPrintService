@@ -7,25 +7,27 @@ namespace StockPriceSheetPrintService.Outbound.ExchangeRates
 {
 	public class FrankfurterExchangeRateClient(HttpClient client, ILogger<FrankfurterExchangeRateClient> logger) : IHistoricalExchangeRateProvider
 	{
-		public async Task<decimal?> GetRateToDkkAsync(string currency, DateOnly date, ClientContext ctx, CancellationToken ct)
+		public async Task<IReadOnlyDictionary<DateOnly, decimal>> GetRatesToDkkAsync(string currency, DateOnly from, DateOnly to, ClientContext ctx, CancellationToken ct)
 		{
-			if (currency == "DKK")
-				return 1m;
-
-			var url = $"v1/{date:yyyy-MM-dd}?base={Uri.EscapeDataString(currency)}&symbols=DKK";
+			var url = $"v1/{from:yyyy-MM-dd}..{to:yyyy-MM-dd}?base={Uri.EscapeDataString(currency)}&symbols=DKK";
 			try
 			{
 				var response = await client.GetFromJsonAsync<FrankfurterRateResponse>(url, ct);
-				if (response is not null && response.Rates.TryGetValue("DKK", out var rate))
-					return rate;
+				if (response is null)
+					return new Dictionary<DateOnly, decimal>();
 
-				logger.LogWarning("[EXCHANGE-RATE] No DKK rate returned for {Currency} on {Date} - ClientContext {ctx}", currency, date, ctx);
-				return null;
+				var rates = new Dictionary<DateOnly, decimal>();
+				foreach (var (dateString, ratesForDate) in response.Rates)
+				{
+					if (DateOnly.TryParse(dateString, out var date) && ratesForDate.TryGetValue("DKK", out var rate))
+						rates[date] = rate;
+				}
+				return rates;
 			}
 			catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException)
 			{
-				logger.LogError(ex, "[EXCHANGE-RATE] Error fetching historical rate for {Currency} on {Date} - ClientContext {ctx}", currency, date, ctx);
-				return null;
+				logger.LogError(ex, "[EXCHANGE-RATE] Error fetching historical rates for {Currency} from {From} to {To} - ClientContext {ctx}", currency, from, to, ctx);
+				return new Dictionary<DateOnly, decimal>();
 			}
 		}
 	}

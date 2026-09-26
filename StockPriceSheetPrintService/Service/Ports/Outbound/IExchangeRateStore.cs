@@ -2,7 +2,7 @@ namespace StockPriceSheetPrintService.Service.Ports.Outbound
 {
 	public interface IExchangeRateStore
 	{
-		Task<decimal?> GetCachedRateAsync(string currency, DateOnly date, CancellationToken ct);
-		Task InsertAsync(string currency, DateOnly date, decimal rateToDkk, CancellationToken ct);
+		Task<Dictionary<DateOnly, decimal>> GetCachedRatesAsync(string currency, DateOnly from, DateOnly to, CancellationToken ct);
+		Task InsertRangeAsync(string currency, IReadOnlyDictionary<DateOnly, decimal> rates, CancellationToken ct);
 	}
 }
