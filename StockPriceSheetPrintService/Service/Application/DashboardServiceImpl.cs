@@ -22,7 +22,8 @@ namespace StockPriceSheetPrintService.Service.Application
 		};
 
 		private readonly DateOnly from = benchmarkOptions.Value.PortfolioStartDate;
-		public async Task<IReadOnlyList<BenchmarkDataPoint>> GetBenchmarkDataAsync(string symbol, ClientContext ctx, CancellationToken ct)
+		public async Task<IReadOnlyList<BenchmarkDataPoint>> GetBenchmarkDataAsync(
+			string symbol, ClientContext ctx, CancellationToken ct)
 		{
 			var yesterday = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1));
 			var latestCachedDate = await repository.GetLatestDateAsync(symbol, ct);
@@ -40,7 +41,8 @@ namespace StockPriceSheetPrintService.Service.Application
 			return await repository.GetCachedDataAsync(symbol, ct);
 		}
 
-		private async Task<IReadOnlyList<BenchmarkDataPoint>> ConvertToDkkAsync(string symbol, BenchmarkQuote quote, ClientContext ctx, CancellationToken ct)
+		private async Task<IReadOnlyList<BenchmarkDataPoint>> ConvertToDkkAsync(
+			string symbol, BenchmarkQuote quote, ClientContext ctx, CancellationToken ct)
 		{
 			if (quote.Points.Count == 0 || string.IsNullOrEmpty(quote.Currency) || quote.Currency == "DKK")
 				return quote.Points;
@@ -49,6 +51,8 @@ namespace StockPriceSheetPrintService.Service.Application
 
 			var rates = await GetRatesToDkkAsync(rateCurrency, quote.Points, ctx, ct);
 
+			var sanitizedSymbol = (symbol ?? string.Empty).Replace("\r", string.Empty).Replace("\n", string.Empty);
+
 			var converted = new List<BenchmarkDataPoint>(quote.Points.Count);
 			foreach (var point in quote.Points)
 			{
@@ -56,7 +60,10 @@ namespace StockPriceSheetPrintService.Service.Application
 				if (!rates.TryGetValue(date, out var rate))
 				{
 					rate = 1m;
-					logger.LogWarning("[EXCHANGE-RATE] No DKK rate found for {Currency} on {Date} for symbol {Symbol} - falling back to 1:1 - ClientContext {ctx}", rateCurrency, date, symbol, ctx);
+					logger.LogWarning(
+						"[EXCHANGE-RATE] No DKK rate found for {Currency} on {Date} for symbol {Symbol}" +
+						" - falling back to 1:1 - ClientContext {ctx}", 
+						rateCurrency, date, sanitizedSymbol, ctx);
 				}
 
 				converted.Add(new BenchmarkDataPoint(point.Date, point.Value / (double)divisor * (double)rate));
@@ -65,7 +72,8 @@ namespace StockPriceSheetPrintService.Service.Application
 			return converted;
 		}
 
-		private async Task<Dictionary<DateOnly, decimal>> GetRatesToDkkAsync(string currency, IReadOnlyList<BenchmarkDataPoint> points, ClientContext ctx, CancellationToken ct)
+		private async Task<Dictionary<DateOnly, decimal>> GetRatesToDkkAsync(
+			string currency, IReadOnlyList<BenchmarkDataPoint> points, ClientContext ctx, CancellationToken ct)
 		{
 			var dates = points.Select(p => DateOnly.FromDateTime(p.Date)).Distinct().ToList();
 			var rangeFrom = dates.Min();
