@@ -38,6 +38,19 @@ namespace StockPriceSheetPrintService.UnitTests
 		}
 
 		[Fact]
+		public async Task GetRateToDkkAsync_RequestsTheV1HistoricalDateEndpoint()
+		{
+			var handler = new RecordingHttpMessageHandler(HttpStatusCode.OK, FrankfurterJson);
+			var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.frankfurter.dev/") };
+			var client = new FrankfurterExchangeRateClient(httpClient, new TestLogger<FrankfurterExchangeRateClient>());
+
+			await client.GetRateToDkkAsync("USD", new DateOnly(2026, 1, 2), Ctx, CancellationToken.None);
+
+			var request = Assert.Single(handler.Requests);
+			Assert.Equal("https://api.frankfurter.dev/v1/2026-01-02?base=USD&symbols=DKK", request.Url);
+		}
+
+		[Fact]
 		public async Task GetRateToDkkAsync_ReturnsOne_WithoutCallingApi_WhenCurrencyIsDkk()
 		{
 			var client = CreateClient(HttpStatusCode.InternalServerError, "should not be called", out _);
