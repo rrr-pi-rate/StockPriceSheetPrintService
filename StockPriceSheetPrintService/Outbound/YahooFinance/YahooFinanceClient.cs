@@ -25,7 +25,8 @@ namespace StockPriceSheetPrintService.Outbound.YahooFinance
 			}
 			catch (HttpRequestException ex)
 			{
-				logger.LogError(ex, "Error occurred while fetching benchmark data for symbol {Symbol} - ClientContext {ctx}", symbol, ctx);
+				var safeSymbol = symbol.Replace("\r", "").Replace("\n", "");
+				logger.LogError(ex, "Error occurred while fetching benchmark data for symbol {Symbol} - ClientContext {ctx}", safeSymbol, ctx);
 				return [];
 			}
 
