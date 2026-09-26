@@ -12,8 +12,7 @@ namespace StockPriceSheetPrintService.Service.Application
 		IServiceScopeFactory scopeFactory,
 		INordnetSymbolStore nordnetSymbolStore,
 		ISchedulerStatus schedulerStatus,
-		IGeminiToggle geminiToggle,
-		ITriggerReportService triggerReportService) : IDiscordBotMessageReceiver
+		IGeminiToggle geminiToggle) : IDiscordBotMessageReceiver
 	{
 		private readonly INordnetStore _nordnetStore = nordnetStore;
 		private readonly IJuneStore _juneStore = juneStore;
@@ -21,7 +20,6 @@ namespace StockPriceSheetPrintService.Service.Application
 		private readonly INordnetSymbolStore _nordnetSymbolStore = nordnetSymbolStore;
 		private readonly ISchedulerStatus _schedulerStatus = schedulerStatus;
 		private readonly IGeminiToggle _geminiToggle = geminiToggle;
-		private readonly ITriggerReportService _triggerReportService = triggerReportService;
 
 		public async Task<BotResponse> HandleMessageAsync(BotMessageCommand command, ClientContext ctx, CancellationToken ct) =>
 			command.Command switch
@@ -284,7 +282,9 @@ namespace StockPriceSheetPrintService.Service.Application
 
 		private async Task<BotResponse> HandleSendReport(ClientContext ctx, CancellationToken ct)
 		{
-			var sent = await _triggerReportService.TrySendPendingReportAsync(ctx, ct);
+			await using var scope = _scopeFactory.CreateAsyncScope();
+			var triggerReportService = scope.ServiceProvider.GetRequiredService<ITriggerReportService>();
+			var sent = await triggerReportService.TrySendPendingReportAsync(ctx, ct);
 			return new TextBotResponse(sent
 				? "📨 Morning report sendt!"
 				: "⚠️ No pending report found - try again after 03:30");

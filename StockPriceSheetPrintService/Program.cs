@@ -1,10 +1,12 @@
 using Discord;
 using Discord.WebSocket;
 using Microsoft.EntityFrameworkCore;
+using Prometheus;
 using Serilog;
 using Serilog.Events;
 using StockPriceSheetPrintService;
 using StockPriceSheetPrintService.Inbound.Listener;
+using StockPriceSheetPrintService.Inbound.Middleware;
 using StockPriceSheetPrintService.Outbound.DiscordUpdates;
 using StockPriceSheetPrintService.Outbound.Persistence;
 using StockPriceSheetPrintService.Outbound.YahooFinance;
@@ -83,8 +85,10 @@ if (app.Environment.IsDevelopment())
 	app.MapOpenApi();
 }
 
+app.UseMiddleware<KirbyVisitTrackingMiddleware>();
 app.UseDefaultFiles();
 app.UseStaticFiles();
 app.UseAuthorization();
+app.MapMetrics();
 app.MapControllers();
 await app.RunAsync();
