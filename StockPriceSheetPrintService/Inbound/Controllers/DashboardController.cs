@@ -23,6 +23,7 @@ namespace StockPriceSheetPrintService.Inbound.Controllers
         }
 
 		[HttpGet("benchmark")]
+		[ProducesResponseType(typeof(List<BenchmarkDataPointDto>), StatusCodes.Status200OK)]
 		public async Task<IActionResult> GetBenchmarkData([FromQuery] string symbol, CancellationToken ct)
 		{
 			var ctx = ClientContextFactory.New("HTTP:dashboard-benchmark");
@@ -33,7 +34,7 @@ namespace StockPriceSheetPrintService.Inbound.Controllers
 
 			var payload = benchmarkEntries.Select(e => new BenchmarkDataPointDto(
 				e.Date.ToString("yyyy-MM-dd"),
-				e.Value));
+				e.Value)).ToList();
 
 			return Ok(payload);
 		}

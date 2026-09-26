@@ -1,5 +1,4 @@
-﻿using Google.GenAI;
-using StockPriceSheetPrintService.Outbound.Dto;
+﻿using StockPriceSheetPrintService.Outbound.Dto;
 using StockPriceSheetPrintService.Outbound.Dto.YahooBenchmark;
 using StockPriceSheetPrintService.Outbound.Mappers;
 using StockPriceSheetPrintService.Service;
@@ -11,7 +10,7 @@ namespace StockPriceSheetPrintService.Outbound.YahooFinance
 {
 	public class YahooFinanceClient(HttpClient client, ILogger<YahooFinanceClient> logger) : IYahooFinanceClient
 	{
-		public async Task<IReadOnlyList<BenchmarkDataPoint>> GetBenchmarkDataAsync(string symbol, DateTimeOffset from, DateTimeOffset to, ClientContext ctx, CancellationToken ct)
+		public async Task<BenchmarkQuote> GetBenchmarkDataAsync(string symbol, DateTimeOffset from, DateTimeOffset to, ClientContext ctx, CancellationToken ct)
 		{
 			var period1 = from.ToUnixTimeSeconds();
 			var period2 = to.ToUnixTimeSeconds();
@@ -23,25 +22,27 @@ namespace StockPriceSheetPrintService.Outbound.YahooFinance
 			{
 				response = await client.GetFromJsonAsync<YahooChartResponse>(url, ct);
 			}
-			catch (HttpRequestException ex)
+			catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or JsonException)
 			{
 				var safeSymbol = symbol.Replace("\r", "").Replace("\n", "");
 				logger.LogError(ex, "Error occurred while fetching benchmark data for symbol {Symbol} - ClientContext {ctx}", safeSymbol, ctx);
-				return [];
+				return new BenchmarkQuote(null, []);
 			}
 
 			var result = response?.Chart.Result?.FirstOrDefault();
 			if (response is null || result is null || response.Chart.Error is not null)
-				return [];
+				return new BenchmarkQuote(null, []);
 
 			var closes = result.Indicators.Quote.FirstOrDefault()?.Close ?? [];
 
-			return [.. result.Timestamp
+			var points = (IReadOnlyList<BenchmarkDataPoint>)[.. result.Timestamp
 				.Zip(closes, (ts, close) => (ts, close))
 				.Where(x => x.close is not null)
 				.Select(x => new BenchmarkDataPoint(
 					DateTimeOffset.FromUnixTimeSeconds(x.ts).UtcDateTime.Date,
 					x.close!.Value))];
+
+			return new BenchmarkQuote(result.Meta?.Currency, points);
 		}
 
 		public async Task<FundNav?> GetFromYahooApiAsync(string ticker, ClientContext ctx, CancellationToken ct)

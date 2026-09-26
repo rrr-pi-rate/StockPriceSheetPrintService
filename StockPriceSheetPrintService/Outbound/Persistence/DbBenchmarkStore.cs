@@ -1,4 +1,5 @@
 ﻿using Microsoft.EntityFrameworkCore;
+using Npgsql;
 using StockPriceSheetPrintService.Outbound.Persistence.Entities;
 using StockPriceSheetPrintService.Service;
 using StockPriceSheetPrintService.Service.Models;
@@ -29,7 +30,14 @@ namespace StockPriceSheetPrintService.Outbound.Persistence
 
 			await using var db = await dbFactory.CreateDbContextAsync(ct);
 			db.BenchmarkData.AddRange(entities);
-			await db.SaveChangesAsync(ct);
+			try
+			{
+				await db.SaveChangesAsync(ct);
+			}
+			catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
+			{
+				// A concurrent request already cached these dates for this symbol - safe to ignore.
+			}
 		}
 
 		public async Task<IReadOnlyList<BenchmarkDataPoint>> GetCachedDataAsync(string symbol, CancellationToken ct)

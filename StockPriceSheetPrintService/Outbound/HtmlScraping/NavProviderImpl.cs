@@ -5,7 +5,6 @@ using StockPriceSheetPrintService.Service;
 using StockPriceSheetPrintService.Service.Models;
 using StockPriceSheetPrintService.Service.Ports.Outbound;
 using System.Globalization;
-using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace StockPriceSheetPrintService.Outbound.HtmlScraping

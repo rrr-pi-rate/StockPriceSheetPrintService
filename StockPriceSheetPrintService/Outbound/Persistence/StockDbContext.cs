@@ -16,10 +16,12 @@ namespace StockPriceSheetPrintService.Outbound.Persistence
 		public DbSet<SaxoPositionsEntity> SaxoPositions { get; set; }
 		public DbSet<GeminiToggleEntity> GeminiToggle { get; set; }
 		public DbSet<BenchmarkDataEntity> BenchmarkData { get; set; }
+		public DbSet<ExchangeRateEntity> ExchangeRates { get; set; }
 
 		protected override void OnModelCreating(ModelBuilder modelBuilder)
 		{
 			modelBuilder.Entity<BenchmarkDataEntity>().HasKey(e => new { e.Symbol, e.Date });
+			modelBuilder.Entity<ExchangeRateEntity>().HasKey(e => new { e.Currency, e.Date });
 			modelBuilder.Entity<SeenTransferEntity>().HasKey(e => e.BookingId);
 			modelBuilder.Entity<NordnetSymbolEntity>().HasKey(e => e.Ticker);
 			modelBuilder.Entity<SaxoPositionsEntity>().HasKey(e => e.Uic);

@@ -9,7 +9,6 @@ using StockPriceSheetPrintService.Inbound.Listener;
 using StockPriceSheetPrintService.Inbound.Middleware;
 using StockPriceSheetPrintService.Outbound.DiscordUpdates;
 using StockPriceSheetPrintService.Outbound.Persistence;
-using StockPriceSheetPrintService.Outbound.YahooFinance;
 using StockPriceSheetPrintService.Service.Application;
 using StockPriceSheetPrintService.Service.Models;
 
@@ -56,13 +55,6 @@ builder.Services.AddHttpClient("StockApi", client =>
 builder.Services.AddHttpClient("NationalbankApi", c =>
 {
 	c.BaseAddress = new Uri("https://www.nationalbanken.dk/");
-});
-
-builder.Services.AddHttpClient<YahooFinanceClient>(client =>
-{
-	client.BaseAddress = new Uri("https://query1.finance.yahoo.com/");
-	client.DefaultRequestHeaders.UserAgent.ParseAdd(
-		"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
 });
 
 builder.WebHost.ConfigureKestrel(options =>

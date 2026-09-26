@@ -7,10 +7,13 @@ namespace StockPriceSheetPrintService.UnitTests.TestDoubles
 	public class FakeDashboardService : IDashboardService
 	{
 		public List<(DateOnly Date, decimal Value)> Entries { get; set; } = [];
+		public IReadOnlyList<BenchmarkDataPoint> BenchmarkPoints { get; set; } = [];
+		public string? LastRequestedSymbol { get; private set; }
 
 		public Task<IReadOnlyList<BenchmarkDataPoint>> GetBenchmarkDataAsync(string symbol, ClientContext ctx, CancellationToken ct)
 		{
-			throw new NotImplementedException();
+			LastRequestedSymbol = symbol;
+			return Task.FromResult(BenchmarkPoints);
 		}
 
 		public Task<List<(DateOnly Date, decimal Value)>> GetHistoricalDataAsync(ClientContext ctx, CancellationToken ct) =>

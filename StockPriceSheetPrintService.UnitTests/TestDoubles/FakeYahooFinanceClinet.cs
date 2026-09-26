@@ -12,10 +12,13 @@ namespace StockPriceSheetPrintService.UnitTests.TestDoubles
 		public Dictionary<string, FundNav?> YahooResultsBySymbol { get; } = [];
 		public HashSet<string> SymbolsThatThrow { get; } = [];
 		public Dictionary<string, int> YahooCallCountBySymbol { get; } = [];
+		public BenchmarkQuote BenchmarkQuoteToReturn { get; set; } = new(null, []);
+		public List<(string Symbol, DateTimeOffset From, DateTimeOffset To)> BenchmarkCalls { get; } = [];
 
-		public Task<IReadOnlyList<BenchmarkDataPoint>> GetBenchmarkDataAsync(string symbol, DateTimeOffset from, DateTimeOffset to, ClientContext ctx, CancellationToken ct)
+		public Task<BenchmarkQuote> GetBenchmarkDataAsync(string symbol, DateTimeOffset from, DateTimeOffset to, ClientContext ctx, CancellationToken ct)
 		{
-			throw new NotImplementedException();
+			BenchmarkCalls.Add((symbol, from, to));
+			return Task.FromResult(BenchmarkQuoteToReturn);
 		}
 
 		public Task<FundNav?> GetFromYahooApiAsync(string ticker, ClientContext ctx, CancellationToken token)
