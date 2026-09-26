@@ -1,4 +1,5 @@
 ﻿using StockPriceSheetPrintService.Outbound.DiscordUpdates;
+using StockPriceSheetPrintService.Outbound.ExchangeRates;
 using StockPriceSheetPrintService.Outbound.GeminiInsights;
 using StockPriceSheetPrintService.Outbound.GoogleSheets;
 using StockPriceSheetPrintService.Outbound.HealthChecks;
@@ -7,6 +8,7 @@ using StockPriceSheetPrintService.Outbound.MarketStack;
 using StockPriceSheetPrintService.Outbound.Memory;
 using StockPriceSheetPrintService.Outbound.Persistence;
 using StockPriceSheetPrintService.Outbound.Saxo;
+using StockPriceSheetPrintService.Outbound.YahooFinance;
 using StockPriceSheetPrintService.Service.Application;
 using StockPriceSheetPrintService.Service.Ports.Inbound;
 using StockPriceSheetPrintService.Service.Ports.Outbound;
@@ -29,12 +31,18 @@ namespace StockPriceSheetPrintService
 
 		public static IServiceCollection AddOutboundServices(this IServiceCollection services)
 		{
+			services.AddSingleton<IBenchmarkStore, DbBenchmarkStore>();
 			services.AddHttpClient<IDiscordNotifier, DiscordNotifier>();
+			services.AddSingleton<IExchangeRateStore, DbExchangeRateStore>();
 			services.AddSingleton<IExecutionGuard, DbExecutionGuard>();
 			services.AddScoped<IGeminiReportInsights, GeminiReportInsightsImpl>();
 			services.AddSingleton<IGeminiToggle, DbGeminiToggleStore>();
 			services.AddSingleton<IGoogleSheetsClient, GoogleSheetsClientImpl>();
 			services.AddHttpClient<IHealthCheckPinger, HealthChecksPinger>();
+			services.AddHttpClient<IHistoricalExchangeRateProvider, FrankfurterExchangeRateClient>(client =>
+			{
+				client.BaseAddress = new Uri("https://api.frankfurter.dev/");
+			});
 			services.AddHttpClient<IHtmlScraper, NavProviderImpl>(client =>
 			{
 				client.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36");
@@ -56,6 +64,12 @@ namespace StockPriceSheetPrintService
 			services.AddSingleton<ISchedulerStatus>(sp => sp.GetRequiredService<SchedulerStatusStore>());
 			services.AddScoped<ISeenTransferStore, DbSeenTransferStore>();
 			services.AddScoped<ITokenStore, DbTokenStore>();
+			services.AddHttpClient<IYahooFinanceClient, YahooFinanceClient>(client =>
+			{
+				client.BaseAddress = new Uri("https://query1.finance.yahoo.com/");
+				client.DefaultRequestHeaders.UserAgent.ParseAdd(
+					"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
+			});
 
 			return services;
 		}

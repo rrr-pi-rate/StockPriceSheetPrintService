@@ -5,7 +5,6 @@ using StockPriceSheetPrintService.Service;
 using StockPriceSheetPrintService.Service.Models;
 using StockPriceSheetPrintService.Service.Ports.Outbound;
 using System.Globalization;
-using System.Text.Json;
 using System.Text.RegularExpressions;
 
 namespace StockPriceSheetPrintService.Outbound.HtmlScraping
@@ -57,35 +56,6 @@ namespace StockPriceSheetPrintService.Outbound.HtmlScraping
 			}
 
 			return JuneMapper.ToFundNav(new JuneData { Nav = nav, Date = date });
-		}
-
-		public async Task<FundNav?> GetFromYahooApiAsync(string ticker, ClientContext ctx, CancellationToken token)
-		{
-			var url = $"https://query1.finance.yahoo.com/v8/finance/chart/{ticker}";
-			var json = await client.GetStringAsync(url, token);
-
-			using var doc = JsonDocument.Parse(json);
-			var result = doc.RootElement
-				.GetProperty("chart")
-				.GetProperty("result")[0];
-
-			var price = result
-				.GetProperty("meta")
-				.GetProperty("regularMarketPrice")
-				.GetDecimal();
-
-			var timestamp = result
-				.GetProperty("meta")
-				.GetProperty("regularMarketTime")
-				.GetInt64();
-
-			var date = DateTimeOffset.FromUnixTimeSeconds(timestamp).LocalDateTime;
-
-			var currency = result.GetProperty("meta").TryGetProperty("currency", out var currencyProp)
-				? currencyProp.GetString()
-				: null;
-
-			return JuneMapper.ToFundNav(new JuneData { Nav = price, Date = date, Currency = currency });
 		}
 	}
 }

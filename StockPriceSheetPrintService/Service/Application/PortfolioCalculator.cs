@@ -12,11 +12,13 @@ namespace StockPriceSheetPrintService.Service.Application
 		IMarketStackService marketStackService,
 		IConfiguration configuration,
 		IJuneStore juneStore,
+		IYahooFinanceClient yahooFinanceClient,
 		INordnetSymbolStore nordnetSymbolStore) : IPortfolioCalculator
 	{
 		private readonly IHttpClientFactory _httpClientFactory = httpClientFactory;
 		private readonly ILogger<PortfolioCalculator> _logger = logger;
 		private readonly IHtmlScraper _htmlScraper = htmlScraper;
+		private readonly IYahooFinanceClient _yahooFinanceClient = yahooFinanceClient;
 		private readonly IMarketStackService _marketStackService = marketStackService;
 		private readonly IConfiguration _configuration = configuration;
 		private readonly IJuneStore _juneStore = juneStore;
@@ -69,7 +71,7 @@ namespace StockPriceSheetPrintService.Service.Application
 			FundNav? yahooData = null;
 			try
 			{
-				yahooData = await _htmlScraper.GetFromYahooApiAsync(symbol, ctx, ct);
+				yahooData = await _yahooFinanceClient.GetFromYahooApiAsync(symbol, ctx, ct);
 			}
 			catch (Exception ex)
 			{

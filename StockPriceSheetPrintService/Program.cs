@@ -10,6 +10,7 @@ using StockPriceSheetPrintService.Inbound.Middleware;
 using StockPriceSheetPrintService.Outbound.DiscordUpdates;
 using StockPriceSheetPrintService.Outbound.Persistence;
 using StockPriceSheetPrintService.Service.Application;
+using StockPriceSheetPrintService.Service.Models;
 
 var errorWebhook = Environment.GetEnvironmentVariable("Discord__WebhookError")
 	?? throw new InvalidOperationException("Discord:WebhookError missing");
@@ -43,7 +44,8 @@ builder.Services.AddHostedService<DiscordBotListener>();
 
 builder.Services.AddInboundServices();
 builder.Services.AddOutboundServices();
-
+builder.Services.Configure<BenchmarkOptions>(
+	builder.Configuration.GetSection(BenchmarkOptions.SectionName));
 
 builder.Services.AddHttpClient("StockApi", client =>
 {
