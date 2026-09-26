@@ -9,12 +9,12 @@ namespace StockPriceSheetPrintService.UnitTests
 	{
 		private static readonly ClientContext Ctx = new(Guid.NewGuid(), "Test", DateTimeOffset.UtcNow);
 
-		private const string FrankfurterJson = """
-			{"amount":1,"base":"USD","date":"2026-01-02","rates":{"DKK":6.83}}
+		private const string FrankfurterRangeJson = """
+			{"amount":1,"base":"USD","start_date":"2026-01-02","end_date":"2026-01-05","rates":{"2026-01-02":{"DKK":6.83},"2026-01-05":{"DKK":6.90}}}
 			""";
 
-		private const string FrankfurterJsonWithoutDkk = """
-			{"amount":1,"base":"USD","date":"2026-01-02","rates":{}}
+		private const string FrankfurterRangeJsonWithoutDkk = """
+			{"amount":1,"base":"USD","start_date":"2026-01-02","end_date":"2026-01-02","rates":{"2026-01-02":{}}}
 			""";
 
 		private static FrankfurterExchangeRateClient CreateClient(HttpStatusCode statusCode, string body, out TestLogger<FrankfurterExchangeRateClient> logger)
@@ -28,57 +28,48 @@ namespace StockPriceSheetPrintService.UnitTests
 		}
 
 		[Fact]
-		public async Task GetRateToDkkAsync_ReturnsRate_FromResponse()
+		public async Task GetRatesToDkkAsync_ReturnsAllRates_FromRangeResponse()
 		{
-			var client = CreateClient(HttpStatusCode.OK, FrankfurterJson, out _);
+			var client = CreateClient(HttpStatusCode.OK, FrankfurterRangeJson, out _);
 
-			var rate = await client.GetRateToDkkAsync("USD", new DateOnly(2026, 1, 2), Ctx, CancellationToken.None);
+			var rates = await client.GetRatesToDkkAsync("USD", new DateOnly(2026, 1, 2), new DateOnly(2026, 1, 5), Ctx, CancellationToken.None);
 
-			Assert.Equal(6.83m, rate);
+			Assert.Equal(2, rates.Count);
+			Assert.Equal(6.83m, rates[new DateOnly(2026, 1, 2)]);
+			Assert.Equal(6.90m, rates[new DateOnly(2026, 1, 5)]);
 		}
 
 		[Fact]
-		public async Task GetRateToDkkAsync_RequestsTheV1HistoricalDateEndpoint()
+		public async Task GetRatesToDkkAsync_OmitsDates_WhereDkkRateIsMissingFromResponse()
 		{
-			var handler = new RecordingHttpMessageHandler(HttpStatusCode.OK, FrankfurterJson);
+			var client = CreateClient(HttpStatusCode.OK, FrankfurterRangeJsonWithoutDkk, out _);
+
+			var rates = await client.GetRatesToDkkAsync("USD", new DateOnly(2026, 1, 2), new DateOnly(2026, 1, 2), Ctx, CancellationToken.None);
+
+			Assert.Empty(rates);
+		}
+
+		[Fact]
+		public async Task GetRatesToDkkAsync_RequestsTheV1RangeEndpoint()
+		{
+			var handler = new RecordingHttpMessageHandler(HttpStatusCode.OK, FrankfurterRangeJson);
 			var httpClient = new HttpClient(handler) { BaseAddress = new Uri("https://api.frankfurter.dev/") };
 			var client = new FrankfurterExchangeRateClient(httpClient, new TestLogger<FrankfurterExchangeRateClient>());
 
-			await client.GetRateToDkkAsync("USD", new DateOnly(2026, 1, 2), Ctx, CancellationToken.None);
+			await client.GetRatesToDkkAsync("USD", new DateOnly(2026, 1, 2), new DateOnly(2026, 1, 5), Ctx, CancellationToken.None);
 
 			var request = Assert.Single(handler.Requests);
-			Assert.Equal("https://api.frankfurter.dev/v1/2026-01-02?base=USD&symbols=DKK", request.Url);
+			Assert.Equal("https://api.frankfurter.dev/v1/2026-01-02..2026-01-05?base=USD&symbols=DKK", request.Url);
 		}
 
 		[Fact]
-		public async Task GetRateToDkkAsync_ReturnsOne_WithoutCallingApi_WhenCurrencyIsDkk()
-		{
-			var client = CreateClient(HttpStatusCode.InternalServerError, "should not be called", out _);
-
-			var rate = await client.GetRateToDkkAsync("DKK", new DateOnly(2026, 1, 2), Ctx, CancellationToken.None);
-
-			Assert.Equal(1m, rate);
-		}
-
-		[Fact]
-		public async Task GetRateToDkkAsync_ReturnsNull_AndLogsWarning_WhenDkkRateMissingFromResponse()
-		{
-			var client = CreateClient(HttpStatusCode.OK, FrankfurterJsonWithoutDkk, out var logger);
-
-			var rate = await client.GetRateToDkkAsync("USD", new DateOnly(2026, 1, 2), Ctx, CancellationToken.None);
-
-			Assert.Null(rate);
-			Assert.Contains(logger.Messages, m => m.Contains("USD"));
-		}
-
-		[Fact]
-		public async Task GetRateToDkkAsync_ReturnsNull_AndLogsError_WhenHttpRequestFails()
+		public async Task GetRatesToDkkAsync_ReturnsEmpty_AndLogsError_WhenHttpRequestFails()
 		{
 			var client = CreateClient(HttpStatusCode.InternalServerError, "boom", out var logger);
 
-			var rate = await client.GetRateToDkkAsync("USD", new DateOnly(2026, 1, 2), Ctx, CancellationToken.None);
+			var rates = await client.GetRatesToDkkAsync("USD", new DateOnly(2026, 1, 2), new DateOnly(2026, 1, 5), Ctx, CancellationToken.None);
 
-			Assert.Null(rate);
+			Assert.Empty(rates);
 			Assert.Contains(logger.Messages, m => m.Contains("USD"));
 		}
 	}

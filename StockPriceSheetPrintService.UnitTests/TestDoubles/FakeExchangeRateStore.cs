@@ -5,15 +5,23 @@ namespace StockPriceSheetPrintService.UnitTests.TestDoubles
 	public class FakeExchangeRateStore : IExchangeRateStore
 	{
 		public Dictionary<(string Currency, DateOnly Date), decimal> CachedRates { get; } = [];
-		public List<(string Currency, DateOnly Date, decimal Rate)> InsertedRates { get; } = [];
+		public List<(string Currency, IReadOnlyDictionary<DateOnly, decimal> Rates)> InsertedRanges { get; } = [];
 
-		public Task<decimal?> GetCachedRateAsync(string currency, DateOnly date, CancellationToken ct) =>
-			Task.FromResult(CachedRates.TryGetValue((currency, date), out var rate) ? rate : (decimal?)null);
-
-		public Task InsertAsync(string currency, DateOnly date, decimal rateToDkk, CancellationToken ct)
+		public Task<Dictionary<DateOnly, decimal>> GetCachedRatesAsync(string currency, DateOnly from, DateOnly to, CancellationToken ct)
 		{
-			InsertedRates.Add((currency, date, rateToDkk));
-			CachedRates[(currency, date)] = rateToDkk;
+			var result = CachedRates
+				.Where(kv => kv.Key.Currency == currency && kv.Key.Date >= from && kv.Key.Date <= to)
+				.ToDictionary(kv => kv.Key.Date, kv => kv.Value);
+
+			return Task.FromResult(result);
+		}
+
+		public Task InsertRangeAsync(string currency, IReadOnlyDictionary<DateOnly, decimal> rates, CancellationToken ct)
+		{
+			InsertedRanges.Add((currency, rates));
+			foreach (var (date, rate) in rates)
+				CachedRates[(currency, date)] = rate;
+
 			return Task.CompletedTask;
 		}
 	}

@@ -9,42 +9,67 @@ namespace StockPriceSheetPrintService.UnitTests
 		private static IDbContextFactory<StockDbContext> CreateInMemoryFactory() => new InMemoryDbContextFactory();
 
 		[Fact]
-		public async Task GetCachedRateAsync_ReturnsNull_WhenNoRateExistsForCurrencyAndDate()
+		public async Task GetCachedRatesAsync_ReturnsEmpty_WhenNoRatesExistForCurrency()
 		{
 			var store = new DbExchangeRateStore(CreateInMemoryFactory());
 
-			var rate = await store.GetCachedRateAsync("USD", new DateOnly(2026, 1, 2), CancellationToken.None);
+			var rates = await store.GetCachedRatesAsync("USD", new DateOnly(2026, 1, 1), new DateOnly(2026, 1, 31), CancellationToken.None);
 
-			Assert.Null(rate);
+			Assert.Empty(rates);
 		}
 
 		[Fact]
-		public async Task InsertAsync_ThenGetCachedRateAsync_ReturnsTheInsertedRate()
+		public async Task InsertRangeAsync_ThenGetCachedRatesAsync_ReturnsAllInsertedRates()
 		{
 			var factory = CreateInMemoryFactory();
 			var store = new DbExchangeRateStore(factory);
 
-			await store.InsertAsync("USD", new DateOnly(2026, 1, 2), 6.83m, CancellationToken.None);
+			await store.InsertRangeAsync("USD", new Dictionary<DateOnly, decimal>
+			{
+				[new DateOnly(2026, 1, 2)] = 6.83m,
+				[new DateOnly(2026, 1, 5)] = 6.90m,
+			}, CancellationToken.None);
 
-			var rate = await store.GetCachedRateAsync("USD", new DateOnly(2026, 1, 2), CancellationToken.None);
+			var rates = await store.GetCachedRatesAsync("USD", new DateOnly(2026, 1, 1), new DateOnly(2026, 1, 31), CancellationToken.None);
 
-			Assert.Equal(6.83m, rate);
+			Assert.Equal(2, rates.Count);
+			Assert.Equal(6.83m, rates[new DateOnly(2026, 1, 2)]);
+			Assert.Equal(6.90m, rates[new DateOnly(2026, 1, 5)]);
 		}
 
 		[Fact]
-		public async Task GetCachedRateAsync_DistinguishesBetweenCurrenciesAndDates()
+		public async Task GetCachedRatesAsync_OnlyReturnsRatesWithinRequestedRangeAndCurrency()
 		{
 			var factory = CreateInMemoryFactory();
 			var store = new DbExchangeRateStore(factory);
 
-			await store.InsertAsync("USD", new DateOnly(2026, 1, 2), 6.83m, CancellationToken.None);
-			await store.InsertAsync("EUR", new DateOnly(2026, 1, 2), 7.46m, CancellationToken.None);
-			await store.InsertAsync("USD", new DateOnly(2026, 1, 3), 6.90m, CancellationToken.None);
+			await store.InsertRangeAsync("USD", new Dictionary<DateOnly, decimal>
+			{
+				[new DateOnly(2026, 1, 2)] = 6.83m,
+				[new DateOnly(2026, 2, 1)] = 6.95m,
+			}, CancellationToken.None);
+			await store.InsertRangeAsync("EUR", new Dictionary<DateOnly, decimal>
+			{
+				[new DateOnly(2026, 1, 2)] = 7.46m,
+			}, CancellationToken.None);
 
-			Assert.Equal(6.83m, await store.GetCachedRateAsync("USD", new DateOnly(2026, 1, 2), CancellationToken.None));
-			Assert.Equal(7.46m, await store.GetCachedRateAsync("EUR", new DateOnly(2026, 1, 2), CancellationToken.None));
-			Assert.Equal(6.90m, await store.GetCachedRateAsync("USD", new DateOnly(2026, 1, 3), CancellationToken.None));
-			Assert.Null(await store.GetCachedRateAsync("EUR", new DateOnly(2026, 1, 3), CancellationToken.None));
+			var rates = await store.GetCachedRatesAsync("USD", new DateOnly(2026, 1, 1), new DateOnly(2026, 1, 31), CancellationToken.None);
+
+			var only = Assert.Single(rates);
+			Assert.Equal(new DateOnly(2026, 1, 2), only.Key);
+			Assert.Equal(6.83m, only.Value);
+		}
+
+		[Fact]
+		public async Task InsertRangeAsync_WithEmptyDictionary_DoesNotThrow_AndInsertsNothing()
+		{
+			var factory = CreateInMemoryFactory();
+			var store = new DbExchangeRateStore(factory);
+
+			await store.InsertRangeAsync("USD", new Dictionary<DateOnly, decimal>(), CancellationToken.None);
+
+			var rates = await store.GetCachedRatesAsync("USD", DateOnly.MinValue, DateOnly.MaxValue, CancellationToken.None);
+			Assert.Empty(rates);
 		}
 	}
 }

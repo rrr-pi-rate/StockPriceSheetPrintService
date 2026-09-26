@@ -2,6 +2,6 @@ namespace StockPriceSheetPrintService.Service.Ports.Outbound
 {
 	public interface IHistoricalExchangeRateProvider
 	{
-		Task<decimal?> GetRateToDkkAsync(string currency, DateOnly date, ClientContext ctx, CancellationToken ct);
+		Task<IReadOnlyDictionary<DateOnly, decimal>> GetRatesToDkkAsync(string currency, DateOnly from, DateOnly to, ClientContext ctx, CancellationToken ct);
 	}
 }
