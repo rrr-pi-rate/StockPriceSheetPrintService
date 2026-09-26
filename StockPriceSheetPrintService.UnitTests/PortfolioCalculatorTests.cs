@@ -19,13 +19,15 @@ namespace StockPriceSheetPrintService.UnitTests
 			PortfolioCalculator Calculator,
 			FakeHtmlScraper HtmlScraper,
 			FakeMarketStackService MarketStackService,
-			FakeNordnetSymbolStore SymbolStore);
+			FakeNordnetSymbolStore SymbolStore,
+			FakeYahooFinanceClinet YahooFinanceClient);
 
 		private static Fixture CreateCalculator(string symbol, int multiplier)
 		{
 			var configuration = new ConfigurationBuilder().Build();
 			var htmlScraper = new FakeHtmlScraper();
 			var marketStackService = new FakeMarketStackService();
+			var yahooFinanceClient = new FakeYahooFinanceClinet();
 			var symbolStore = new FakeNordnetSymbolStore
 			{
 				Symbols = new Dictionary<string, decimal> { [symbol] = multiplier }
@@ -38,16 +40,17 @@ namespace StockPriceSheetPrintService.UnitTests
 				marketStackService,
 				configuration,
 				new FakeJuneStore(),
+				yahooFinanceClient,
 				symbolStore);
 
-			return new Fixture(calculator, htmlScraper, marketStackService, symbolStore);
+			return new Fixture(calculator, htmlScraper, marketStackService, symbolStore, yahooFinanceClient);
 		}
 
 		[Fact]
 		public async Task CalculateTotalStockValueAsync_UsesYahooPrice_AndNeverCallsMarketStack_WhenYahooSucceeds()
 		{
 			var fixture = CreateCalculator("TEST", multiplier: 10);
-			fixture.HtmlScraper.YahooResultsBySymbol["TEST"] = new FundNav { Nav = 100m, Currency = "DKK", Date = DateTime.UtcNow };
+			fixture.YahooFinanceClient.YahooResultsBySymbol["TEST"] = new FundNav { Nav = 100m, Currency = "DKK", Date = DateTime.UtcNow };
 
 			var total = await fixture.Calculator.CalculateTotalStockValueAsync(Ctx, CancellationToken.None);
 
@@ -72,7 +75,7 @@ namespace StockPriceSheetPrintService.UnitTests
 		public async Task CalculateTotalStockValueAsync_FallsBackToMarketStack_WhenYahooReturnsZeroNav()
 		{
 			var fixture = CreateCalculator("TEST", multiplier: 10);
-			fixture.HtmlScraper.YahooResultsBySymbol["TEST"] = new FundNav { Nav = 0m, Currency = "DKK", Date = DateTime.UtcNow };
+			fixture.YahooFinanceClient.YahooResultsBySymbol["TEST"] = new FundNav { Nav = 0m, Currency = "DKK", Date = DateTime.UtcNow };
 			fixture.MarketStackService.PricesBySymbol["TEST"] = new StockPrice { Symbol = "TEST", Close = 50m, Currency = "DKK" };
 
 			var total = await fixture.Calculator.CalculateTotalStockValueAsync(Ctx, CancellationToken.None);
@@ -84,7 +87,7 @@ namespace StockPriceSheetPrintService.UnitTests
 		public async Task CalculateTotalStockValueAsync_FallsBackToMarketStack_WhenYahooThrows()
 		{
 			var fixture = CreateCalculator("TEST", multiplier: 10);
-			fixture.HtmlScraper.SymbolsThatThrow.Add("TEST");
+			fixture.YahooFinanceClient.SymbolsThatThrow.Add("TEST");
 			fixture.MarketStackService.PricesBySymbol["TEST"] = new StockPrice { Symbol = "TEST", Close = 75m, Currency = "DKK" };
 
 			var total = await fixture.Calculator.CalculateTotalStockValueAsync(Ctx, CancellationToken.None);

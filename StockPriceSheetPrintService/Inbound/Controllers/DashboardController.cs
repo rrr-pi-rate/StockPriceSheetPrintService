@@ -21,5 +21,21 @@ namespace StockPriceSheetPrintService.Inbound.Controllers
             var payload = entries.Select(e => new DashboardDataPointDto(e.Date.ToString("yyyy-MM-dd"), e.Value)).ToList();
             return Ok(payload);
         }
-    }
+
+		[HttpGet("benchmark")]
+		public async Task<IActionResult> GetBenchmarkData([FromQuery] string symbol, CancellationToken ct)
+		{
+			var ctx = ClientContextFactory.New("HTTP:dashboard-benchmark");
+			using var _1 = LogContext.PushProperty("CorrelationId", ctx.CorrelationId);
+			using var _2 = LogContext.PushProperty("Source", ctx.Source);
+
+			var benchmarkEntries = await dashboardService.GetBenchmarkDataAsync(symbol, ctx, ct);
+
+			var payload = benchmarkEntries.Select(e => new BenchmarkDataPointDto(
+				e.Date.ToString("yyyy-MM-dd"),
+				e.Value));
+
+			return Ok(payload);
+		}
+	}
 }
