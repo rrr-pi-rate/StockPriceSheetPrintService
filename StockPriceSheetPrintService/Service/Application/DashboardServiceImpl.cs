@@ -53,6 +53,7 @@ namespace StockPriceSheetPrintService.Service.Application
 
 			var sanitizedSymbol = (symbol ?? string.Empty).Replace("\r", string.Empty).Replace("\n", string.Empty);
 
+			var missingDates = new List<DateOnly>();
 			var converted = new List<BenchmarkDataPoint>(quote.Points.Count);
 			foreach (var point in quote.Points)
 			{
@@ -60,13 +61,23 @@ namespace StockPriceSheetPrintService.Service.Application
 				if (!rates.TryGetValue(date, out var rate))
 				{
 					rate = 1m;
-					logger.LogWarning(
-						"[EXCHANGE-RATE] No DKK rate found for {Currency} on {Date} for symbol {Symbol}" +
-						" - falling back to 1:1 - ClientContext {ctx}", 
-						rateCurrency, date, sanitizedSymbol, ctx);
+					missingDates.Add(date);
 				}
 
 				converted.Add(new BenchmarkDataPoint(point.Date, point.Value / (double)divisor * (double)rate));
+			}
+
+			if (missingDates.Count > 0)
+			{
+				const int maxDatesInLogMessage = 10;
+				var datesText = missingDates.Count <= maxDatesInLogMessage
+					? string.Join(", ", missingDates)
+					: string.Join(", ", missingDates.Take(maxDatesInLogMessage)) + $" (+{missingDates.Count - maxDatesInLogMessage} more)";
+
+				logger.LogWarning(
+					"[EXCHANGE-RATE] No DKK rate found for {Currency} on {MissingCount} date(s) for symbol {Symbol}" +
+					" - falling back to 1:1 - Dates: {Dates} - ClientContext {ctx}",
+					rateCurrency, missingDates.Count, sanitizedSymbol, datesText, ctx);
 			}
 
 			return converted;
