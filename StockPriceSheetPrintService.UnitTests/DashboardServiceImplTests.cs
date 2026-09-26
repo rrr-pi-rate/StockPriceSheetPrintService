@@ -127,6 +127,22 @@ namespace StockPriceSheetPrintService.UnitTests
 		}
 
 		[Fact]
+		public async Task GetBenchmarkDataAsync_LogsExactlyOneWarning_RegardlessOfHowManyDatesAreMissing()
+		{
+			var fixture = CreateService();
+			var points = Enumerable.Range(0, 50)
+				.Select(i => new BenchmarkDataPoint(new DateTime(2026, 1, 1).AddDays(i), 4000.0 + i))
+				.ToList();
+			fixture.BenchmarkStore.LatestDateToReturn = null;
+			fixture.YahooClient.BenchmarkQuoteToReturn = new BenchmarkQuote("USD", points);
+
+			await fixture.Service.GetBenchmarkDataAsync("^GSPC", Ctx, CancellationToken.None);
+
+			Assert.Single(fixture.Logger.Messages);
+			Assert.Contains(fixture.Logger.Messages, m => m.Contains("50 date(s)") && m.Contains("more)"));
+		}
+
+		[Fact]
 		public async Task GetBenchmarkDataAsync_DoesNotConvert_WhenCurrencyIsDkk()
 		{
 			var fixture = CreateService();
