@@ -12,7 +12,7 @@ namespace StockPriceSheetPrintService.Outbound.ExchangeRates
 			if (currency == "DKK")
 				return 1m;
 
-			var url = $"v2/{date:yyyy-MM-dd}?base={Uri.EscapeDataString(currency)}&symbols=DKK";
+			var url = $"v1/{date:yyyy-MM-dd}?base={Uri.EscapeDataString(currency)}&symbols=DKK";
 			try
 			{
 				var response = await client.GetFromJsonAsync<FrankfurterRateResponse>(url, ct);
