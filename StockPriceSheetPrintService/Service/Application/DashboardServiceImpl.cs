@@ -61,15 +61,27 @@ namespace StockPriceSheetPrintService.Service.Application
 
 			var missingDates = new List<DateOnly>();
 			var converted = new List<BenchmarkDataPoint>(quote.Points.Count);
+			var sortedRateDates = rates.Keys.OrderBy(d => d).ToList();
 			foreach (var point in quote.Points)
 			{
 				var date = DateOnly.FromDateTime(point.Date);
 				if (!rates.TryGetValue(date, out var rate))
 				{
-					rate = 1m;
-					missingDates.Add(date);
+					var nearest = sortedRateDates
+						.Where(d => d <= date)
+						.DefaultIfEmpty(sortedRateDates.FirstOrDefault())
+						.Last();
+					if (rates.TryGetValue(nearest, out var fallbackRate))
+					{
+						rate = fallbackRate;
+					}
+					else
+					{
+						// ingen kurs overhovedet i nærheden — spring punktet over
+						missingDates.Add(date);
+						continue;
+					}
 				}
-
 				converted.Add(new BenchmarkDataPoint(point.Date, point.Value / (double)divisor * (double)rate));
 			}
 
@@ -82,7 +94,7 @@ namespace StockPriceSheetPrintService.Service.Application
 
 				logger.LogWarning(
 					"[EXCHANGE-RATE] No DKK rate found for {Currency} on {MissingCount} date(s) for symbol {Symbol}" +
-					" - falling back to 1:1 - Dates: {Dates} - ClientContext {ctx}",
+					" - point(s) skipped - Dates: {Dates} - ClientContext {ctx}",
 					rateCurrency, missingDates.Count, sanitizedSymbol, datesText, ctx);
 			}
 

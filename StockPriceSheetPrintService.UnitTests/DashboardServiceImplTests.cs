@@ -111,7 +111,7 @@ namespace StockPriceSheetPrintService.UnitTests
 		}
 
 		[Fact]
-		public async Task GetBenchmarkDataAsync_FallsBackToRateOne_WithoutCachingIt_AndLogsWarning_WhenNoRateIsFound()
+		public async Task GetBenchmarkDataAsync_SkipsPoint_WithoutCachingAnyRate_AndLogsWarning_WhenNoRateIsFoundAnywhere()
 		{
 			var fixture = CreateService();
 			var date = new DateTime(2026, 1, 2);
@@ -120,10 +120,30 @@ namespace StockPriceSheetPrintService.UnitTests
 
 			await fixture.Service.GetBenchmarkDataAsync("^GSPC", Ctx, CancellationToken.None);
 
-			var inserted = Assert.Single(fixture.BenchmarkStore.LastInsertedPoints!);
-			Assert.Equal(4000.0, inserted.Value, precision: 5);
+			Assert.Empty(fixture.BenchmarkStore.LastInsertedPoints!);
 			Assert.Empty(fixture.ExchangeRateStore.InsertedRanges);
 			Assert.Contains(fixture.Logger.Messages, m => m.Contains("USD") && m.Contains("^GSPC"));
+		}
+
+		[Fact]
+		public async Task GetBenchmarkDataAsync_UsesNearestPrecedingRate_WhenExactDateHasNoRate()
+		{
+			var fixture = CreateService();
+			var date1 = new DateTime(2026, 1, 2);
+			var date2 = new DateTime(2026, 1, 3); // e.g. a US market day the Danish/European FX market has no rate for
+			fixture.BenchmarkStore.LatestDateToReturn = null;
+			fixture.YahooClient.BenchmarkQuoteToReturn = new BenchmarkQuote("USD", [
+				new BenchmarkDataPoint(date1, 4000.0),
+				new BenchmarkDataPoint(date2, 4010.0),
+			]);
+			fixture.ExchangeRateStore.CachedRates[("USD", DateOnly.FromDateTime(date1))] = 6.83m;
+
+			await fixture.Service.GetBenchmarkDataAsync("^GSPC", Ctx, CancellationToken.None);
+
+			var inserted = fixture.BenchmarkStore.LastInsertedPoints!;
+			Assert.Equal(2, inserted.Count);
+			Assert.Equal(4000.0 * 6.83, inserted[0].Value, precision: 5);
+			Assert.Equal(4010.0 * 6.83, inserted[1].Value, precision: 5);
 		}
 
 		[Fact]
