@@ -20,15 +20,34 @@ namespace StockPriceSheetPrintService.Outbound.Persistence
 
 		public async Task InsertAsync(string symbol, IReadOnlyList<BenchmarkDataPoint> points, CancellationToken ct)
 		{
-			var entities = points.Select(p => new BenchmarkDataEntity
-			{
-				Symbol = symbol,
-				Date = DateOnly.FromDateTime(p.Date),
-				CloseValue = p.Value,
-				FetchedAt = DateTimeOffset.UtcNow,
-			});
+			if (points.Count == 0) return;
 
 			await using var db = await dbFactory.CreateDbContextAsync(ct);
+
+			// SaveChangesAsync batches all rows into one transaction, so a single already-cached
+			// date (e.g. Yahoo re-returning a boundary day we already have) would roll back the
+			// whole batch - including genuinely new rows - and get silently swallowed by the
+			// catch below, leaving the cache permanently stuck one day behind. Filter out dates
+			// we already have first so only genuinely new rows are ever inserted.
+			var dates = points.Select(p => DateOnly.FromDateTime(p.Date)).ToList();
+			var existingDates = await db.BenchmarkData
+				.Where(e => e.Symbol == symbol && dates.Contains(e.Date))
+				.Select(e => e.Date)
+				.ToHashSetAsync(ct);
+
+			var entities = points
+				.Where(p => !existingDates.Contains(DateOnly.FromDateTime(p.Date)))
+				.Select(p => new BenchmarkDataEntity
+				{
+					Symbol = symbol,
+					Date = DateOnly.FromDateTime(p.Date),
+					CloseValue = p.Value,
+					FetchedAt = DateTimeOffset.UtcNow,
+				})
+				.ToList();
+
+			if (entities.Count == 0) return;
+
 			db.BenchmarkData.AddRange(entities);
 			try
 			{
@@ -36,7 +55,8 @@ namespace StockPriceSheetPrintService.Outbound.Persistence
 			}
 			catch (DbUpdateException ex) when (ex.InnerException is PostgresException { SqlState: PostgresErrorCodes.UniqueViolation })
 			{
-				// A concurrent request already cached these dates for this symbol - safe to ignore.
+				// A concurrent request inserted the same dates between our existence check and
+				// this save - safe to ignore.
 			}
 		}
 
