@@ -31,8 +31,14 @@ namespace StockPriceSheetPrintService.Service.Application
 			if (latestCachedDate is null || latestCachedDate < yesterday)
 			{
 				var fetchFrom = latestCachedDate?.AddDays(1) ?? from;
+				// Yahoo's daily close for "yesterday" is timestamped at market close (afternoon
+				// UTC), not midnight - using midnight of yesterday as the upper bound excludes
+				// yesterday's own bar and, once fetchFrom == yesterday, collapses period1/period2
+				// into a zero-width window that only re-returns the day before (already cached).
+				// Midnight of *today* is the smallest bound that always includes yesterday's bar.
+				var fetchTo = yesterday.AddDays(1);
 				var quote = await yahooClient.GetBenchmarkDataAsync(
-					symbol, fetchFrom.ToDateTime(TimeOnly.MinValue), yesterday.ToDateTime(TimeOnly.MinValue), ctx, ct);
+					symbol, fetchFrom.ToDateTime(TimeOnly.MinValue), fetchTo.ToDateTime(TimeOnly.MinValue), ctx, ct);
 
 				var dkkPoints = await ConvertToDkkAsync(symbol, quote, ctx, ct);
 				await repository.InsertAsync(symbol, dkkPoints, ct);
