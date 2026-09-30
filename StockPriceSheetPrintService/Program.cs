@@ -17,6 +17,7 @@ var errorWebhook = Environment.GetEnvironmentVariable("Discord__WebhookError")
 
 Log.Logger = new LoggerConfiguration()
 	.Enrich.FromLogContext()
+	.Filter.ByExcluding(IsMetricsScrape)
 	.WriteTo.Console(new Serilog.Formatting.Json.JsonFormatter())
 	.WriteTo.Sink(new DiscordSink(errorWebhook), LogEventLevel.Warning)
 	.CreateLogger();
@@ -81,3 +82,20 @@ app.UseAuthorization();
 app.MapMetrics();
 app.MapControllers();
 await app.RunAsync();
+
+// Prometheus scraper /metrics hvert 15. sekund – undgå at støje i loggen
+static bool IsMetricsScrape(LogEvent logEvent)
+{
+	if (logEvent.Level >= LogEventLevel.Warning) return false;
+
+	foreach (var key in new[] { "RequestPath", "Path" })
+	{
+		if (logEvent.Properties.TryGetValue(key, out var value)
+			&& value is ScalarValue { Value: string path }
+			&& path.Equals("/metrics", StringComparison.OrdinalIgnoreCase))
+		{
+			return true;
+		}
+	}
+	return false;
+}
