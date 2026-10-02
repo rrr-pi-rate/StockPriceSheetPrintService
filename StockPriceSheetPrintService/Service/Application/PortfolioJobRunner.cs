@@ -43,15 +43,16 @@ namespace StockPriceSheetPrintService.Service.Application
 				var transfersTask = _dataFetcher.GetNewTransfersAsync(ctx, ct);
 				var previousDayValueTask = _dataFetcher.GetPreviousDayValueAsync(ctx, ct);
 				var netPositionsTask = _dataFetcher.GetNetPositionsAsync(ctx, ct);
-				var atmTask = _dataFetcher.GetAtmValue(ctx, ct);
+				var highestValueTask = _dataFetcher.GetHighestValueAsync(ctx, ct);
 
-				await Task.WhenAll(saxoBalanceTask, nordnetValueTask, juneValueTask, transfersTask, previousDayValueTask, netPositionsTask, atmTask);
+				await Task.WhenAll(saxoBalanceTask, nordnetValueTask, juneValueTask, transfersTask, previousDayValueTask, netPositionsTask, highestValueTask);
 
 				var values = new PortfolioValues(saxoBalanceTask.Result, nordnetValueTask.Result, juneValueTask.Result);
 				var newTransfers = transfersTask.Result;
 				var previousDayValue = previousDayValueTask.Result;
 				var saxoPositions = netPositionsTask.Result;
-				var atm = atmTask.Result;
+				// Højeste værdi læst FØR dagens række indsættes, så dagens total kan sammenlignes med tidligere rekord
+				var atm = highestValueTask.Result is { } highest && values.Total > highest ? "Yes" : "No";
 
 				_logger.LogInformation("[JOB] ✓ Portfolio values fetched");
 				_logger.LogInformation("[JOB]   Saxo: {saxo:F2} | Nordnet: {nordnet:F2} | June: {june:F2} | Total: {total:F2}",

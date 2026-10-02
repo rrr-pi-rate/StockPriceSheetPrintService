@@ -18,8 +18,6 @@ namespace StockPriceSheetPrintService.Outbound.GoogleSheets
 		private const string CredentialsPath = "Secrets/stockprizeservice-59bc4ea3961d.json";
 		private const string ApplicationName = "HomeServerBackend";
 
-		private const string ATMCell = "J1";
-
 		private async Task<SheetsService> CreateServiceAsync(CancellationToken ct)
 		{
 			var credential = (await CredentialFactory.FromFileAsync<ServiceAccountCredential>(CredentialsPath, ct))
@@ -118,15 +116,6 @@ namespace StockPriceSheetPrintService.Outbound.GoogleSheets
 			_logger.LogInformation("[SHEETS] ✓ Formula {formula} written to {range} (Saxo: {saxo:F2}, Nordnet: {nordnet:F2}, June: {june:F2})",
 				formula, updateRange, values.Saxo, values.Nordnet, values.June);
 			return dayBeforeValue;
-		}
-
-		public async Task<string> GetAtmValue(string spreadsheetId, string sheetName, CancellationToken ct)
-		{
-			var service = await CreateServiceAsync(ct);
-			var getRequest = service.Spreadsheets.Values.Get(spreadsheetId, $"'{sheetName}'!{ATMCell}");
-
-			var getResponse = await getRequest.ExecuteAsync(ct);
-			return getResponse.Values?.FirstOrDefault()?.FirstOrDefault()?.ToString() ?? string.Empty;
 		}
 	}
 }

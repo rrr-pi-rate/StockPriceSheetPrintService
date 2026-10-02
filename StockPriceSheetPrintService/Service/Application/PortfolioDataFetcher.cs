@@ -202,7 +202,7 @@ namespace StockPriceSheetPrintService.Service.Application
 			}
 		}
 
-		public async Task<string> GetAtmValue(ClientContext ctx, CancellationToken ct)
+		public async Task<decimal?> GetHighestValueAsync(ClientContext ctx, CancellationToken ct)
 		{
 			try
 			{
@@ -210,23 +210,23 @@ namespace StockPriceSheetPrintService.Service.Application
 				const string sheetName = "Daily";
 				if (string.IsNullOrEmpty(spreadsheetId))
 				{
-					_logger.LogWarning("[FETCHER] SheetsApi:SheetsKey configuration missing, cannot fetch previous day value");
-					return string.Empty;
+					_logger.LogWarning("[FETCHER] SheetsApi:SheetsKey configuration missing, cannot fetch highest value");
+					return null;
 				}
-				var atm = await _googleSheetsClient.GetAtmValue(spreadsheetId, sheetName, ct);
 
-				if (atm.Equals(string.Empty))
+				var history = await _googleSheetsClient.GetHistoricalDataAsync(spreadsheetId, sheetName, ctx, ct);
+				if (history.Count == 0)
 				{
-					_logger.LogWarning("[FETCHER] No ATM value avaliable, returning default: No");
-					return "No";
+					_logger.LogWarning("[FETCHER] No historical values available, cannot determine all time high");
+					return null;
 				}
 
-				return atm;
+				return history.Max(h => h.Value);
 			}
 			catch (Exception ex)
 			{
-				_logger.LogError(ex, "[FETCHER] Unexpected error fetching ATM value");
-				return "No";
+				_logger.LogError(ex, "[FETCHER] Unexpected error fetching highest value");
+				return null;
 			}
 		}
 	}
