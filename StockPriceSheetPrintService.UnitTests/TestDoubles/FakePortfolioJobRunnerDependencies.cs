@@ -21,7 +21,7 @@ namespace StockPriceSheetPrintService.UnitTests.TestDoubles
 		public List<Transfer> Transfers { get; set; } = [];
 		public decimal PreviousDayValue { get; set; }
 		public List<Instrument> NetPositions { get; set; } = [];
-		public string Atm { get; set; } = "No";
+		public decimal? HighestValue { get; set; }
 
 		public Task<decimal> GetSaxoBalanceAsync(ClientContext ctx, CancellationToken ct) => Task.FromResult(SaxoBalance);
 		public Task<decimal> GetNordnetValueAsync(ClientContext ctx, CancellationToken ct) => Task.FromResult(NordnetValue);
@@ -29,7 +29,7 @@ namespace StockPriceSheetPrintService.UnitTests.TestDoubles
 		public Task<List<Transfer>> GetNewTransfersAsync(ClientContext ctx, CancellationToken ct) => Task.FromResult(Transfers);
 		public Task<decimal> GetPreviousDayValueAsync(ClientContext ctx, CancellationToken ct) => Task.FromResult(PreviousDayValue);
 		public Task<List<Instrument>> GetNetPositionsAsync(ClientContext ctx, CancellationToken ct) => Task.FromResult(NetPositions);
-		public Task<string> GetAtmValue(ClientContext ctx, CancellationToken ct) => Task.FromResult(Atm);
+		public Task<decimal?> GetHighestValueAsync(ClientContext ctx, CancellationToken ct) => Task.FromResult(HighestValue);
 	}
 
 	public class FakeNordnetSymbolStore : INordnetSymbolStore
@@ -69,6 +69,7 @@ namespace StockPriceSheetPrintService.UnitTests.TestDoubles
 		public PortfolioValues? LastUpdateGoogleSheetsValues { get; private set; }
 		public int ReportMorningCallCount { get; private set; }
 		public PortfolioValues? LastReportMorningValues { get; private set; }
+		public string? LastReportMorningAtm { get; private set; }
 
 		public Task UpdateGoogleSheetsAsync(PortfolioValues values, ClientContext ctx, CancellationToken ct)
 		{
@@ -81,6 +82,7 @@ namespace StockPriceSheetPrintService.UnitTests.TestDoubles
 		{
 			ReportMorningCallCount++;
 			LastReportMorningValues = values;
+			LastReportMorningAtm = atm;
 			return Task.CompletedTask;
 		}
 	}

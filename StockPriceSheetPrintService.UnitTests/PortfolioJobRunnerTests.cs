@@ -91,5 +91,21 @@ namespace StockPriceSheetPrintService.UnitTests
 			Assert.Equal(1, fixture.GeminiInsights.CallCount);
 			Assert.Equal(new PortfolioValues(100m, 200m, 300m), fixture.GeminiInsights.LastValues);
 		}
+
+		// Dagens total er 600 (100 + 200 + 300)
+		[Theory]
+		[InlineData(599, "Yes")]
+		[InlineData(600, "No")]
+		[InlineData(601, "No")]
+		[InlineData(null, "No")]
+		public async Task RunJobAsync_ReportsAllTimeHigh_OnlyWhenTodaysTotalExceedsPreviousHighest(int? highestValue, string expectedAtm)
+		{
+			var fixture = CreateRunner();
+			fixture.DataFetcher.HighestValue = highestValue;
+
+			await fixture.Runner.RunJobAsync(Ctx, CancellationToken.None);
+
+			Assert.Equal(expectedAtm, fixture.Reporter.LastReportMorningAtm);
+		}
 	}
 }
