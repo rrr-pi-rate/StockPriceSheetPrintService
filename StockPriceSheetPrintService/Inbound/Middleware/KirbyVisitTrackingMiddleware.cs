@@ -4,11 +4,11 @@ namespace StockPriceSheetPrintService.Inbound.Middleware
 {
 	public class KirbyVisitTrackingMiddleware(RequestDelegate next, ILogger<KirbyVisitTrackingMiddleware> logger)
 	{
-		private static readonly string[] TrackedPaths = ["/kirby.html", "/kirby-landing.html"];
+		private static readonly string[] TrackedPaths = ["/track/landing", "/track/dashboard"];
 
 		internal static readonly Counter Visits = Metrics.CreateCounter(
 			"kirby_page_visits_total",
-			"Antal visninger af Kirby-siderne, fordelt på side og operativsystem",
+			"Antal visninger af frontend-siderne (landing/dashboard), fordelt på side og operativsystem",
 			new CounterConfiguration { LabelNames = ["page", "os"] });
 
 		public async Task InvokeAsync(HttpContext context)
@@ -18,18 +18,22 @@ namespace StockPriceSheetPrintService.Inbound.Middleware
 				? null
 				: TrackedPaths.FirstOrDefault(p => string.Equals(p, requestPath, StringComparison.OrdinalIgnoreCase));
 
-			if (trackedPath is not null)
+			if (trackedPath is not null && HttpMethods.IsPost(context.Request.Method))
 			{
 				var clientIp = ResolveClientIp(context);
 				var userAgent = context.Request.Headers.UserAgent.ToString();
 				var os = ClassifyOs(userAgent);
-				var page = trackedPath.TrimStart('/');
+				var page = trackedPath["/track/".Length..];
 
 				Visits.WithLabels(page, os).Inc();
 
 				logger.LogInformation(
 					"Kirby page visit {Page} from {ClientIp} using {Os} ({UserAgent})",
 					page, clientIp, os, userAgent);
+
+				// Frontend (stockPriceFrontend) kalder dette fire-and-forget fra browseren – ingen body at returnere.
+				context.Response.StatusCode = StatusCodes.Status204NoContent;
+				return;
 			}
 
 			await next(context);

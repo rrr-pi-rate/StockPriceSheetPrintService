@@ -77,27 +77,28 @@ namespace StockPriceSheetPrintService.UnitTests
 		}
 
 		[Fact]
-		public async Task InvokeAsync_TracksVisit_ForKirbyLandingPage()
+		public async Task InvokeAsync_TracksVisit_ForLandingPage()
 		{
 			var tracker = new NextInvocationTracker();
 			var logger = new TestLogger<KirbyVisitTrackingMiddleware>();
 			var middleware = new KirbyVisitTrackingMiddleware(tracker.Next, logger);
 
 			var context = new DefaultHttpContext();
-			context.Request.Path = "/kirby-landing.html";
+			context.Request.Path = "/track/landing";
+			context.Request.Method = HttpMethods.Post;
 			context.Request.Headers.UserAgent = WindowsUserAgent;
 			context.Request.Headers["CF-Connecting-IP"] = "198.51.100.42";
 
-			var before = KirbyVisitTrackingMiddleware.Visits.WithLabels("kirby-landing.html", "Windows").Value;
+			var before = KirbyVisitTrackingMiddleware.Visits.WithLabels("landing", "Windows").Value;
 
 			await middleware.InvokeAsync(context);
 
-			var after = KirbyVisitTrackingMiddleware.Visits.WithLabels("kirby-landing.html", "Windows").Value;
+			var after = KirbyVisitTrackingMiddleware.Visits.WithLabels("landing", "Windows").Value;
 			Assert.Equal(before + 1, after);
-			Assert.True(tracker.WasCalled);
+			Assert.False(tracker.WasCalled);
 
 			var message = Assert.Single(logger.Messages);
-			Assert.Contains("kirby-landing.html", message);
+			Assert.Contains("landing", message);
 			Assert.Contains("198.51.100.42", message);
 			Assert.Contains("Windows", message);
 		}
@@ -110,14 +111,15 @@ namespace StockPriceSheetPrintService.UnitTests
 			var middleware = new KirbyVisitTrackingMiddleware(tracker.Next, logger);
 
 			var context = new DefaultHttpContext();
-			context.Request.Path = "/KIRBY.HTML";
+			context.Request.Path = "/TRACK/Dashboard";
+			context.Request.Method = HttpMethods.Post;
 			context.Request.Headers.UserAgent = CurlUserAgent;
 
-			var before = KirbyVisitTrackingMiddleware.Visits.WithLabels("kirby.html", "Other").Value;
+			var before = KirbyVisitTrackingMiddleware.Visits.WithLabels("dashboard", "Other").Value;
 
 			await middleware.InvokeAsync(context);
 
-			var after = KirbyVisitTrackingMiddleware.Visits.WithLabels("kirby.html", "Other").Value;
+			var after = KirbyVisitTrackingMiddleware.Visits.WithLabels("dashboard", "Other").Value;
 			Assert.Equal(before + 1, after);
 		}
 
@@ -139,14 +141,48 @@ namespace StockPriceSheetPrintService.UnitTests
 		}
 
 		[Fact]
-		public async Task InvokeAsync_AlwaysCallsNext_RegardlessOfPath()
+		public async Task InvokeAsync_DoesNotTrack_ForNonPostRequests()
 		{
 			var tracker = new NextInvocationTracker();
 			var logger = new TestLogger<KirbyVisitTrackingMiddleware>();
 			var middleware = new KirbyVisitTrackingMiddleware(tracker.Next, logger);
 
 			var context = new DefaultHttpContext();
-			context.Request.Path = "/kirby.html";
+			context.Request.Path = "/track/dashboard";
+			context.Request.Method = HttpMethods.Get;
+
+			await middleware.InvokeAsync(context);
+
+			Assert.True(tracker.WasCalled);
+			Assert.Empty(logger.Messages);
+		}
+
+		[Fact]
+		public async Task InvokeAsync_Returns204AndDoesNotCallNext_ForTrackedPost()
+		{
+			var tracker = new NextInvocationTracker();
+			var logger = new TestLogger<KirbyVisitTrackingMiddleware>();
+			var middleware = new KirbyVisitTrackingMiddleware(tracker.Next, logger);
+
+			var context = new DefaultHttpContext();
+			context.Request.Path = "/track/dashboard";
+			context.Request.Method = HttpMethods.Post;
+
+			await middleware.InvokeAsync(context);
+
+			Assert.Equal(StatusCodes.Status204NoContent, context.Response.StatusCode);
+			Assert.False(tracker.WasCalled);
+		}
+
+		[Fact]
+		public async Task InvokeAsync_CallsNext_ForUntrackedPaths()
+		{
+			var tracker = new NextInvocationTracker();
+			var logger = new TestLogger<KirbyVisitTrackingMiddleware>();
+			var middleware = new KirbyVisitTrackingMiddleware(tracker.Next, logger);
+
+			var context = new DefaultHttpContext();
+			context.Request.Path = "/dashboard/data";
 			context.Request.Headers.UserAgent = MacUserAgent;
 
 			await middleware.InvokeAsync(context);

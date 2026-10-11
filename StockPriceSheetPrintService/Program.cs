@@ -78,6 +78,7 @@ if (app.Environment.IsDevelopment())
 	app.MapOpenApi();
 }
 
+app.UseMiddleware<KirbyVisitTrackingMiddleware>();
 app.UseAuthorization();
 app.MapMetrics();
 app.MapControllers();
