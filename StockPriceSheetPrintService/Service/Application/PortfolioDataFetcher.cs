@@ -40,14 +40,8 @@ namespace StockPriceSheetPrintService.Service.Application
 					return 0m;
 				}
 
-				// Saldoen er live, men rækken dækker i går: træk overførsler dateret efter rækkens dato fra,
-				// så de ikke ligger i en række, hvor de ikke forklares af rapporten
-				var adjustment = await GetLaterTransfersSumAsync(saxoToken, ctx, ct);
-				if (adjustment != 0m)
-					_logger.LogInformation("[FETCHER] Adjusting Saxo balance by -{adjustment:F2} DKK (transfers dated after {rowDate})", adjustment, GetRowDate());
-
-				_logger.LogInformation("[FETCHER] Saxo balance: {balance:F2} DKK", balance.TotalValue - adjustment);
-				return balance.TotalValue - adjustment;
+				_logger.LogInformation("[FETCHER] Saxo balance: {balance:F2} DKK", balance.TotalValue);
+				return balance.TotalValue;
 			}
 			catch (Exception ex)
 			{
@@ -112,23 +106,6 @@ namespace StockPriceSheetPrintService.Service.Application
 				.Where(t => t.Amount > 0)
 				.ToList();
 
-		private Task<List<Transfer>> GetRecentTransfersAsync(string saxoToken, ClientContext ctx, CancellationToken ct) =>
-			_saxoAccountService.GetSaxoTransactionsAsync(saxoToken, DateTime.UtcNow.AddDays(-14), DateTime.UtcNow, ctx, ct);
-
-		private async Task<decimal> GetLaterTransfersSumAsync(string saxoToken, ClientContext ctx, CancellationToken ct)
-		{
-			try
-			{
-				var transfers = await GetRecentTransfersAsync(saxoToken, ctx, ct);
-				return SumTransfersAfter(transfers, GetRowDate());
-			}
-			catch (Exception ex)
-			{
-				_logger.LogWarning(ex, "[FETCHER] Could not fetch transfers to adjust Saxo balance, using live balance");
-				return 0m;
-			}
-		}
-
 		private async Task<DateOnly> GetPreviousRowDateAsync(DateOnly rowDate, ClientContext ctx, CancellationToken ct)
 		{
 			var fallback = rowDate.AddDays(-1);
@@ -141,7 +118,7 @@ namespace StockPriceSheetPrintService.Service.Application
 			return previous;
 		}
 
-		public async Task<List<Transfer>> GetNewTransfersAsync(ClientContext ctx, CancellationToken ct)
+		public async Task<TransferReport> GetNewTransfersAsync(ClientContext ctx, CancellationToken ct)
 		{
 			try
 			{
@@ -151,10 +128,11 @@ namespace StockPriceSheetPrintService.Service.Application
 				if (saxoToken == null)
 				{
 					_logger.LogWarning("[FETCHER] Saxo token not available for transfer check");
-					return [];
+					return TransferReport.Empty;
 				}
 
-				var transfers = await GetRecentTransfersAsync(saxoToken, ctx, ct);
+				var transfers = await _saxoAccountService.GetSaxoTransactionsAsync(saxoToken, DateTime.UtcNow.AddDays(-14), DateTime.UtcNow, ctx, ct);
+				var laterTransfersSum = SumTransfersAfter(transfers, rowDate);
 				var previousRowDate = await GetPreviousRowDateAsync(rowDate, ctx, ct);
 
 				var seenIds = await _seenTransferStore.LoadAsync(ct);
@@ -166,12 +144,12 @@ namespace StockPriceSheetPrintService.Service.Application
 					_logger.LogInformation("[FETCHER] Found {count} new transfers", newTransfers.Count);
 				}
 
-				return newTransfers;
+				return new TransferReport(newTransfers, laterTransfersSum);
 			}
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "[FETCHER] Unexpected error fetching transfers");
-				return [];
+				return TransferReport.Empty;
 			}
 		}
 
