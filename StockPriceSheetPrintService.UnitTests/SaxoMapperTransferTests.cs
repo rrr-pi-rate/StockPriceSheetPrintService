@@ -1,0 +1,76 @@
+using System.Text.Json;
+using StockPriceSheetPrintService.Outbound.Dto.Saxo.Transactions;
+using StockPriceSheetPrintService.Outbound.Mappers;
+
+namespace StockPriceSheetPrintService.UnitTests
+{
+	public class SaxoMapperTransferTests
+	{
+		private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
+
+		[Fact]
+		public void ToTransfers_MapsBookedTransferIdAmountAndDate()
+		{
+			var dto = JsonSerializer.Deserialize<SaxoTransactionsResponse>("""
+				{
+					"Data": [
+						{
+							"BookingId": "60247672468",
+							"BookedAmount": 5000.0,
+							"IsIntradayData": false,
+							"Date": "2026-10-02"
+						}
+					]
+				}
+				""", JsonOptions)!;
+
+			var transfer = Assert.Single(SaxoMapper.ToTransfers(dto));
+
+			Assert.Equal("60247672468", transfer.Id);
+			Assert.Equal(5000m, transfer.Amount);
+			Assert.Equal(new DateOnly(2026, 10, 2), transfer.Date);
+		}
+
+		[Fact]
+		public void ToTransfers_SkipsTransfersBetweenTheClientsOwnAccounts_ButKeepsExternalOnes()
+		{
+			var dto = JsonSerializer.Deserialize<SaxoTransactionsResponse>("""
+				{
+					"Data": [
+						{ "BookingId": "40390536585", "BookedAmount": 5665.83, "FundingSubType": "IntraClientTransfer", "Date": "2025-01-02" },
+						{ "BookingId": "40390493971", "BookedAmount": -5665.83, "FundingSubType": "IntraClientTransfer", "Date": "2025-01-02" },
+						{ "BookingId": "41636637418", "BookedAmount": 20878.51, "FundingSubType": "InstantDeposit", "Date": "2025-02-18" },
+						{ "BookingId": "41214120818", "BookedAmount": 3625.0, "FundingSubType": "DepositFromExternal", "Date": "2025-02-03" }
+					]
+				}
+				""", JsonOptions)!;
+
+			var transfers = SaxoMapper.ToTransfers(dto);
+
+			Assert.Equal(["41636637418", "41214120818"], transfers.Select(t => t.Id));
+		}
+
+		[Fact]
+		public void ToTransfers_IncludesIntradayTransactionsWithIntradayAmount()
+		{
+			var dto = JsonSerializer.Deserialize<SaxoTransactionsResponse>("""
+				{
+					"Data": [
+						{
+							"BookingId": "7765187990",
+							"IntradayAmount": 5000.0,
+							"IsIntradayData": true,
+							"Date": "2026-10-02"
+						}
+					]
+				}
+				""", JsonOptions)!;
+
+			var transfer = Assert.Single(SaxoMapper.ToTransfers(dto));
+
+			Assert.Equal("7765187990", transfer.Id);
+			Assert.Equal(5000m, transfer.Amount);
+			Assert.Equal(new DateOnly(2026, 10, 2), transfer.Date);
+		}
+	}
+}

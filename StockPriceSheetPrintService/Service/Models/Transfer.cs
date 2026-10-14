@@ -1,4 +1,4 @@
 namespace StockPriceSheetPrintService.Service.Models
 {
-	public record Transfer(string Id, decimal Amount);
+	public record Transfer(string Id, decimal Amount, DateOnly Date);
 }
