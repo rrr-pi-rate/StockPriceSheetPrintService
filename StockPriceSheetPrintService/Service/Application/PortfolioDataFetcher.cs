@@ -40,8 +40,14 @@ namespace StockPriceSheetPrintService.Service.Application
 					return 0m;
 				}
 
-				_logger.LogInformation("[FETCHER] Saxo balance: {balance:F2} DKK", balance.TotalValue);
-				return balance.TotalValue;
+				// Saldoen er live, men rækken dækker i går: træk overførsler dateret efter rækkens dato fra,
+				// så de ikke ligger i en række, hvor de ikke forklares af rapporten
+				var adjustment = await GetLaterTransfersSumAsync(saxoToken, ctx, ct);
+				if (adjustment != 0m)
+					_logger.LogInformation("[FETCHER] Adjusting Saxo balance by -{adjustment:F2} DKK (transfers dated after {rowDate})", adjustment, GetRowDate());
+
+				_logger.LogInformation("[FETCHER] Saxo balance: {balance:F2} DKK", balance.TotalValue - adjustment);
+				return balance.TotalValue - adjustment;
 			}
 			catch (Exception ex)
 			{
@@ -89,19 +95,57 @@ namespace StockPriceSheetPrintService.Service.Application
 			}
 		}
 
-		public static List<Transfer> SelectTransfersForRow(IEnumerable<Transfer> transfers, HashSet<string> seenIds, DateOnly rowDate) =>
+		// Rækken i arket (og rapporten) dateres i går
+		private static DateOnly GetRowDate() => DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1));
+
+		// Overførsler dateret efter rækkens dato ligger i den live Saxo-saldo, men hører til en senere række.
+		// Datoløse poster (Date = default) ignoreres.
+		public static decimal SumTransfersAfter(IEnumerable<Transfer> transfers, DateOnly rowDate) =>
+			transfers.Where(t => t.Date > rowDate).Sum(t => t.Amount);
+
+		// Overførsler der skal forklares i rækkens rapport: dateret efter forrige række og til og med rækkens dato,
+		// ikke allerede meldt. Datoløse poster (Date = default) ignoreres.
+		public static List<Transfer> SelectTransfersForRow(IEnumerable<Transfer> transfers, HashSet<string> seenIds, DateOnly previousRowDate, DateOnly rowDate) =>
 			transfers
-				.Where(t => t.Date == rowDate)
+				.Where(t => t.Date > previousRowDate && t.Date <= rowDate)
 				.Where(t => !seenIds.Contains(t.Id))
 				.Where(t => t.Amount > 0)
 				.ToList();
+
+		private Task<List<Transfer>> GetRecentTransfersAsync(string saxoToken, ClientContext ctx, CancellationToken ct) =>
+			_saxoAccountService.GetSaxoTransactionsAsync(saxoToken, DateTime.UtcNow.AddDays(-14), DateTime.UtcNow, ctx, ct);
+
+		private async Task<decimal> GetLaterTransfersSumAsync(string saxoToken, ClientContext ctx, CancellationToken ct)
+		{
+			try
+			{
+				var transfers = await GetRecentTransfersAsync(saxoToken, ctx, ct);
+				return SumTransfersAfter(transfers, GetRowDate());
+			}
+			catch (Exception ex)
+			{
+				_logger.LogWarning(ex, "[FETCHER] Could not fetch transfers to adjust Saxo balance, using live balance");
+				return 0m;
+			}
+		}
+
+		private async Task<DateOnly> GetPreviousRowDateAsync(DateOnly rowDate, ClientContext ctx, CancellationToken ct)
+		{
+			var fallback = rowDate.AddDays(-1);
+			var spreadsheetId = _configuration["SheetsApi:SheetsKey"];
+			if (string.IsNullOrEmpty(spreadsheetId))
+				return fallback;
+
+			var history = await _googleSheetsClient.GetHistoricalDataAsync(spreadsheetId, "Daily", ctx, ct);
+			var previous = history.Where(x => x.Date < rowDate).Select(x => x.Date).DefaultIfEmpty(fallback).Max();
+			return previous;
+		}
 
 		public async Task<List<Transfer>> GetNewTransfersAsync(ClientContext ctx, CancellationToken ct)
 		{
 			try
 			{
-				// Rækken i arket (og rapporten) dateres i går – overførsler hører til den række, hvis dato er deres bookingdato
-				var rowDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1));
+				var rowDate = GetRowDate();
 
 				var saxoToken = await _saxoTokenService.GetAccessTokenAsync(ctx, ct);
 				if (saxoToken == null)
@@ -110,12 +154,11 @@ namespace StockPriceSheetPrintService.Service.Application
 					return [];
 				}
 
-				var fromDate = DateTime.UtcNow.AddDays(-14);
-				var toDate = DateTime.UtcNow;
-				var transfers = await _saxoAccountService.GetSaxoTransactionsAsync(saxoToken, fromDate, toDate, ctx, ct);
+				var transfers = await GetRecentTransfersAsync(saxoToken, ctx, ct);
+				var previousRowDate = await GetPreviousRowDateAsync(rowDate, ctx, ct);
 
 				var seenIds = await _seenTransferStore.LoadAsync(ct);
-				var newTransfers = SelectTransfersForRow(transfers, seenIds, rowDate);
+				var newTransfers = SelectTransfersForRow(transfers, seenIds, previousRowDate, rowDate);
 
 				if (newTransfers.Count > 0)
 				{

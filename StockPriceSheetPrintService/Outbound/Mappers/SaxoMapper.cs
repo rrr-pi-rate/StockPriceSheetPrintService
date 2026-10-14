@@ -16,11 +16,10 @@ namespace StockPriceSheetPrintService.Outbound.Mappers
 		public static Transfer ToTransfer(SaxoTransaction dto) =>
 			new(dto.BookingId, dto.Amount, dto.Date);
 
-		// Intraday-transaktioner springes over: Saxo dokumenterer, at identifikatorer ikke er tilgængelige før
-		// transaktionen er bogført, og at overførslen får et andet BookingId når den bogføres – så den ville blive
-		// meldt to gange. Kun bogførte overførsler har det endelige BookingId.
+		// Også foreløbige (intraday) transaktioner medtages: de ligger allerede i den live Saxo-saldo. Deres BookingId
+		// er ikke endeligt (overførslen får et andet id ved bogføring), så dedup sker på rækkens dato, ikke på id alene.
 		public static List<Transfer> ToTransfers(SaxoTransactionsResponse dto) =>
-			dto.Data.Where(t => !t.IsIntradayData).Select(ToTransfer).ToList();
+			dto.Data.Select(ToTransfer).ToList();
 
 		public static Instrument ToInstrument(SaxoInstrument dto) => new()
 		{

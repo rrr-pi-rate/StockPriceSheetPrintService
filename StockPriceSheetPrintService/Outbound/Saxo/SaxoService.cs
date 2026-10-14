@@ -113,6 +113,10 @@ namespace StockPriceSheetPrintService.Outbound.Saxo
 			var dto = JsonSerializer.Deserialize<SaxoTransactionsResponse>(transactionsData, JsonOptions)
 				?? throw new InvalidOperationException("Empty transactions response from Saxo.");
 
+			foreach (var intraday in dto.Data.Where(t => t.IsIntradayData))
+				_logger.LogInformation("[SAXO] Intraday transaction: BookingId={bookingId}, Date={date}, BookedAmount={booked}, IntradayAmount={intraday}",
+					intraday.BookingId, intraday.Date, intraday.BookedAmount, intraday.IntradayAmount);
+
 			return SaxoMapper.ToTransfers(dto);
 		}
 

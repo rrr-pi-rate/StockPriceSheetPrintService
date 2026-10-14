@@ -16,7 +16,6 @@ namespace StockPriceSheetPrintService.UnitTests
 					"Data": [
 						{
 							"BookingId": "60247672468",
-							"PositionId": "7765187990",
 							"BookedAmount": 5000.0,
 							"IsIntradayData": false,
 							"Date": "2026-10-02"
@@ -33,7 +32,7 @@ namespace StockPriceSheetPrintService.UnitTests
 		}
 
 		[Fact]
-		public void ToTransfers_SkipsIntradayTransactions()
+		public void ToTransfers_IncludesIntradayTransactionsWithIntradayAmount()
 		{
 			var dto = JsonSerializer.Deserialize<SaxoTransactionsResponse>("""
 				{
@@ -48,7 +47,11 @@ namespace StockPriceSheetPrintService.UnitTests
 				}
 				""", JsonOptions)!;
 
-			Assert.Empty(SaxoMapper.ToTransfers(dto));
+			var transfer = Assert.Single(SaxoMapper.ToTransfers(dto));
+
+			Assert.Equal("7765187990", transfer.Id);
+			Assert.Equal(5000m, transfer.Amount);
+			Assert.Equal(new DateOnly(2026, 10, 2), transfer.Date);
 		}
 	}
 }
