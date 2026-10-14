@@ -16,10 +16,13 @@ namespace StockPriceSheetPrintService.Outbound.Mappers
 		public static Transfer ToTransfer(SaxoTransaction dto) =>
 			new(dto.BookingId, dto.Amount, dto.Date);
 
+		private const string IntraClientTransfer = "IntraClientTransfer";
+
 		// Også foreløbige (intraday) transaktioner medtages: de ligger allerede i den live Saxo-saldo. Deres BookingId
 		// er ikke endeligt (overførslen får et andet id ved bogføring), så dedup sker på rækkens dato, ikke på id alene.
+		// Overførsler mellem klientens egne konti springes over: de har et +ben og et −ben, men ingen penge kom udefra.
 		public static List<Transfer> ToTransfers(SaxoTransactionsResponse dto) =>
-			dto.Data.Select(ToTransfer).ToList();
+			dto.Data.Where(t => t.FundingSubType != IntraClientTransfer).Select(ToTransfer).ToList();
 
 		public static Instrument ToInstrument(SaxoInstrument dto) => new()
 		{

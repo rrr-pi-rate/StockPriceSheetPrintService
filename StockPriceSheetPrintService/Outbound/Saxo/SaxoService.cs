@@ -114,8 +114,8 @@ namespace StockPriceSheetPrintService.Outbound.Saxo
 				?? throw new InvalidOperationException("Empty transactions response from Saxo.");
 
 			foreach (var intraday in dto.Data.Where(t => t.IsIntradayData))
-				_logger.LogInformation("[SAXO] Intraday transaction: BookingId={bookingId}, Date={date}, BookedAmount={booked}, IntradayAmount={intraday}",
-					intraday.BookingId, intraday.Date, intraday.BookedAmount, intraday.IntradayAmount);
+				_logger.LogInformation("[SAXO] Intraday transaction: BookingId={bookingId}, Date={date}, BookedAmount={booked}, IntradayAmount={intraday}, FundingSubType={fundingSubType}",
+					intraday.BookingId, intraday.Date, intraday.BookedAmount, intraday.IntradayAmount, intraday.FundingSubType);
 
 			return SaxoMapper.ToTransfers(dto);
 		}
