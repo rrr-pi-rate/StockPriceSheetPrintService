@@ -32,7 +32,7 @@ namespace StockPriceSheetPrintService.UnitTests.TestDoubles
 	public class FakeSeenTransferStore : ISeenTransferStore
 	{
 		public Task<HashSet<string>> LoadAsync(CancellationToken ct) => Task.FromResult(new HashSet<string>());
-		public Task SaveAsync(IEnumerable<string> newIds, CancellationToken ct) => Task.CompletedTask;
+		public Task SaveAsync(IEnumerable<Transfer> newTransfers, CancellationToken ct) => Task.CompletedTask;
 	}
 
 	public class FakeNordnetStore : INordnetStore
