@@ -119,7 +119,7 @@ namespace StockPriceSheetPrintService.Service.Application
 
 				if (newTransfers.Count > 0)
 				{
-					await _seenTransferStore.SaveAsync(newTransfers.Select(t => t.Id), ct);
+					await _seenTransferStore.SaveAsync(newTransfers, ct);
 					_logger.LogInformation("[FETCHER] Found {count} new transfers", newTransfers.Count);
 				}
 
