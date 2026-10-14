@@ -4,6 +4,6 @@ namespace StockPriceSheetPrintService.Outbound.Persistence.Entities
 	{
 		public string BookingId { get; set; } = "";
 		public decimal Amount { get; set; }
-		public DateTime SeenAt { get; set; }
+		public DateOnly Date { get; set; }
 	}
 }

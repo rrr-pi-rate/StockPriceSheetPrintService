@@ -70,6 +70,20 @@ namespace StockPriceSheetPrintService.UnitTests
 		}
 
 		[Fact]
+		public async Task RunJobAsync_SubtractsTransfersDatedAfterTheRow_FromTheSaxoValue()
+		{
+			var fixture = CreateRunner();
+			fixture.DataFetcher.SaxoBalance = 5100m;
+			fixture.DataFetcher.LaterTransfersSum = 5000m;
+
+			await fixture.Runner.RunJobAsync(Ctx, CancellationToken.None);
+
+			var expectedValues = new PortfolioValues(100m, 200m, 300m);
+			Assert.Equal(expectedValues, fixture.Reporter.LastUpdateGoogleSheetsValues);
+			Assert.Equal(expectedValues, fixture.Reporter.LastReportMorningValues);
+		}
+
+		[Fact]
 		public async Task RunJobAsync_SkipsGemini_WhenToggleIsDisabled()
 		{
 			var fixture = CreateRunner();

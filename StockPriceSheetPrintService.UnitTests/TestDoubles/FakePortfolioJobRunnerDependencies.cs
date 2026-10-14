@@ -26,7 +26,8 @@ namespace StockPriceSheetPrintService.UnitTests.TestDoubles
 		public Task<decimal> GetSaxoBalanceAsync(ClientContext ctx, CancellationToken ct) => Task.FromResult(SaxoBalance);
 		public Task<decimal> GetNordnetValueAsync(ClientContext ctx, CancellationToken ct) => Task.FromResult(NordnetValue);
 		public Task<decimal> GetJuneValueAsync(ClientContext ctx, CancellationToken ct) => Task.FromResult(JuneValue);
-		public Task<List<Transfer>> GetNewTransfersAsync(ClientContext ctx, CancellationToken ct) => Task.FromResult(Transfers);
+		public decimal LaterTransfersSum { get; set; }
+		public Task<TransferReport> GetNewTransfersAsync(ClientContext ctx, CancellationToken ct) => Task.FromResult(new TransferReport(Transfers, LaterTransfersSum));
 		public Task<decimal> GetPreviousDayValueAsync(ClientContext ctx, CancellationToken ct) => Task.FromResult(PreviousDayValue);
 		public Task<List<Instrument>> GetNetPositionsAsync(ClientContext ctx, CancellationToken ct) => Task.FromResult(NetPositions);
 		public Task<decimal?> GetHighestValueAsync(ClientContext ctx, CancellationToken ct) => Task.FromResult(HighestValue);

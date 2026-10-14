@@ -89,33 +89,54 @@ namespace StockPriceSheetPrintService.Service.Application
 			}
 		}
 
-		public async Task<List<Transfer>> GetNewTransfersAsync(ClientContext ctx, CancellationToken ct)
+		// Rækken i arket (og rapporten) dateres i går
+		private static DateOnly GetRowDate() => DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1));
+
+		// Overførsler dateret efter rækkens dato ligger i den live Saxo-saldo, men hører til en senere række.
+		// Datoløse poster (Date = default) ignoreres.
+		public static decimal SumTransfersAfter(IEnumerable<Transfer> transfers, DateOnly rowDate) =>
+			transfers.Where(t => t.Date > rowDate).Sum(t => t.Amount);
+
+		// Overførsler der skal forklares i rækkens rapport: dateret efter forrige række og til og med rækkens dato,
+		// ikke allerede meldt. Datoløse poster (Date = default) ignoreres.
+		public static List<Transfer> SelectTransfersForRow(IEnumerable<Transfer> transfers, HashSet<string> seenIds, DateOnly previousRowDate, DateOnly rowDate) =>
+			transfers
+				.Where(t => t.Date > previousRowDate && t.Date <= rowDate)
+				.Where(t => !seenIds.Contains(t.Id))
+				.Where(t => t.Amount > 0)
+				.ToList();
+
+		private async Task<DateOnly> GetPreviousRowDateAsync(DateOnly rowDate, ClientContext ctx, CancellationToken ct)
+		{
+			var fallback = rowDate.AddDays(-1);
+			var spreadsheetId = _configuration["SheetsApi:SheetsKey"];
+			if (string.IsNullOrEmpty(spreadsheetId))
+				return fallback;
+
+			var history = await _googleSheetsClient.GetHistoricalDataAsync(spreadsheetId, "Daily", ctx, ct);
+			var previous = history.Where(x => x.Date < rowDate).Select(x => x.Date).DefaultIfEmpty(fallback).Max();
+			return previous;
+		}
+
+		public async Task<TransferReport> GetNewTransfersAsync(ClientContext ctx, CancellationToken ct)
 		{
 			try
 			{
-				var today = DateTime.UtcNow;
-				if (today.Day < 28 && today.Day > 10)
-				{
-					_logger.LogDebug("[FETCHER] Not in transfer window, skipping transfer check");
-					return [];
-				}
+				var rowDate = GetRowDate();
 
 				var saxoToken = await _saxoTokenService.GetAccessTokenAsync(ctx, ct);
 				if (saxoToken == null)
 				{
 					_logger.LogWarning("[FETCHER] Saxo token not available for transfer check");
-					return [];
+					return TransferReport.Empty;
 				}
 
-				var fromDate = DateTime.UtcNow.AddDays(-14);
-				var toDate = DateTime.UtcNow;
-				var transfers = await _saxoAccountService.GetSaxoTransactionsAsync(saxoToken, fromDate, toDate, ctx, ct);
+				var transfers = await _saxoAccountService.GetSaxoTransactionsAsync(saxoToken, DateTime.UtcNow.AddDays(-14), DateTime.UtcNow, ctx, ct);
+				var laterTransfersSum = SumTransfersAfter(transfers, rowDate);
+				var previousRowDate = await GetPreviousRowDateAsync(rowDate, ctx, ct);
 
 				var seenIds = await _seenTransferStore.LoadAsync(ct);
-				var newTransfers = transfers
-					.Where(t => !seenIds.Contains(t.Id))
-					.Where(t => t.Amount > 0)
-					.ToList();
+				var newTransfers = SelectTransfersForRow(transfers, seenIds, previousRowDate, rowDate);
 
 				if (newTransfers.Count > 0)
 				{
@@ -123,12 +144,12 @@ namespace StockPriceSheetPrintService.Service.Application
 					_logger.LogInformation("[FETCHER] Found {count} new transfers", newTransfers.Count);
 				}
 
-				return newTransfers;
+				return new TransferReport(newTransfers, laterTransfersSum);
 			}
 			catch (Exception ex)
 			{
 				_logger.LogError(ex, "[FETCHER] Unexpected error fetching transfers");
-				return [];
+				return TransferReport.Empty;
 			}
 		}
 

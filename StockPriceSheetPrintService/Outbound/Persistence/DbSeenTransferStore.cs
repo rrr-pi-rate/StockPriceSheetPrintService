@@ -21,7 +21,7 @@ namespace StockPriceSheetPrintService.Outbound.Persistence
 
 			var existing = await db.SeenTransfers.Select(e => e.BookingId).ToHashSetAsync(ct);
 			foreach (var t in newTransfers.Where(t => !existing.Contains(t.Id)))
-				db.SeenTransfers.Add(new SeenTransferEntity { BookingId = t.Id, Amount = t.Amount, SeenAt = DateTime.UtcNow });
+				db.SeenTransfers.Add(new SeenTransferEntity { BookingId = t.Id, Amount = t.Amount, Date = t.Date });
 
 			await db.SaveChangesAsync(ct);
 		}

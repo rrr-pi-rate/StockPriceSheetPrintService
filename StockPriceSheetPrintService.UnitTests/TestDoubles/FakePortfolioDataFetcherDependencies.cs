@@ -23,16 +23,26 @@ namespace StockPriceSheetPrintService.UnitTests.TestDoubles
 	{
 		public Task<AccountBalance?> GetBalanceAsync(string accessToken, ClientContext ctx, CancellationToken ct) =>
 			throw new NotSupportedException("Not used by these tests");
+		public List<Transfer>? Transfers { get; set; }
 		public Task<List<Transfer>> GetSaxoTransactionsAsync(string accessToken, DateTime fromDate, DateTime toDate, ClientContext ctx, CancellationToken ct) =>
-			throw new NotSupportedException("Not used by these tests");
+			Transfers is null
+				? throw new NotSupportedException("Not used by these tests")
+				: Task.FromResult(Transfers);
 		public Task<List<Instrument>> GetNetPositionsAsync(string accessToken, ClientContext ctx, CancellationToken ct) =>
 			throw new NotSupportedException("Not used by these tests");
 	}
 
 	public class FakeSeenTransferStore : ISeenTransferStore
 	{
-		public Task<HashSet<string>> LoadAsync(CancellationToken ct) => Task.FromResult(new HashSet<string>());
-		public Task SaveAsync(IEnumerable<Transfer> newTransfers, CancellationToken ct) => Task.CompletedTask;
+		public HashSet<string> Seen { get; set; } = [];
+		public List<Transfer> Saved { get; } = [];
+
+		public Task<HashSet<string>> LoadAsync(CancellationToken ct) => Task.FromResult(Seen);
+		public Task SaveAsync(IEnumerable<Transfer> newTransfers, CancellationToken ct)
+		{
+			Saved.AddRange(newTransfers);
+			return Task.CompletedTask;
+		}
 	}
 
 	public class FakeNordnetStore : INordnetStore

@@ -7,7 +7,7 @@ namespace StockPriceSheetPrintService.Service.Ports.Outbound
 		Task<decimal> GetSaxoBalanceAsync(ClientContext ctx, CancellationToken ct);
 		Task<decimal> GetNordnetValueAsync(ClientContext ctx, CancellationToken ct);
 		Task<decimal> GetJuneValueAsync(ClientContext ctx, CancellationToken ct);
-		Task<List<Transfer>> GetNewTransfersAsync(ClientContext ctx, CancellationToken ct);
+		Task<TransferReport> GetNewTransfersAsync(ClientContext ctx, CancellationToken ct);
 		Task<decimal> GetPreviousDayValueAsync(ClientContext ctx, CancellationToken ct);
 		Task<List<Instrument>> GetNetPositionsAsync(ClientContext ctx, CancellationToken ct);
 		Task<decimal?> GetHighestValueAsync(ClientContext ctx, CancellationToken ct);

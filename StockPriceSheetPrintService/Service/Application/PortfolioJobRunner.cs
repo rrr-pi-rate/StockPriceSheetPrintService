@@ -47,8 +47,14 @@ namespace StockPriceSheetPrintService.Service.Application
 
 				await Task.WhenAll(saxoBalanceTask, nordnetValueTask, juneValueTask, transfersTask, previousDayValueTask, netPositionsTask, highestValueTask);
 
-				var values = new PortfolioValues(saxoBalanceTask.Result, nordnetValueTask.Result, juneValueTask.Result);
-				var newTransfers = transfersTask.Result;
+				var transferReport = transfersTask.Result;
+				var newTransfers = transferReport.NewTransfers;
+
+				// Saldoen er live, men rækken dækker i går: træk overførsler dateret efter rækkens dato fra,
+				// så de ikke ligger i en række, hvor de ikke forklares af rapporten
+				if (transferReport.LaterTransfersSum != 0m)
+					_logger.LogInformation("[JOB] Adjusting Saxo balance by -{adjustment:F2} DKK (transfers dated after the row date)", transferReport.LaterTransfersSum);
+				var values = new PortfolioValues(saxoBalanceTask.Result - transferReport.LaterTransfersSum, nordnetValueTask.Result, juneValueTask.Result);
 				var previousDayValue = previousDayValueTask.Result;
 				var saxoPositions = netPositionsTask.Result;
 				// Højeste værdi læst FØR dagens række indsættes, så dagens total kan sammenlignes med tidligere rekord
