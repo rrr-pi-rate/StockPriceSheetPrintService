@@ -89,16 +89,19 @@ namespace StockPriceSheetPrintService.Service.Application
 			}
 		}
 
+		public static List<Transfer> SelectTransfersForRow(IEnumerable<Transfer> transfers, HashSet<string> seenIds, DateOnly rowDate) =>
+			transfers
+				.Where(t => t.Date == rowDate)
+				.Where(t => !seenIds.Contains(t.Id))
+				.Where(t => t.Amount > 0)
+				.ToList();
+
 		public async Task<List<Transfer>> GetNewTransfersAsync(ClientContext ctx, CancellationToken ct)
 		{
 			try
 			{
-				var today = DateTime.UtcNow;
-				if (today.Day < 28 && today.Day > 10)
-				{
-					_logger.LogDebug("[FETCHER] Not in transfer window, skipping transfer check");
-					return [];
-				}
+				// Rækken i arket (og rapporten) dateres i går – overførsler hører til den række, hvis dato er deres bookingdato
+				var rowDate = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-1));
 
 				var saxoToken = await _saxoTokenService.GetAccessTokenAsync(ctx, ct);
 				if (saxoToken == null)
@@ -112,10 +115,7 @@ namespace StockPriceSheetPrintService.Service.Application
 				var transfers = await _saxoAccountService.GetSaxoTransactionsAsync(saxoToken, fromDate, toDate, ctx, ct);
 
 				var seenIds = await _seenTransferStore.LoadAsync(ct);
-				var newTransfers = transfers
-					.Where(t => !seenIds.Contains(t.Id))
-					.Where(t => t.Amount > 0)
-					.ToList();
+				var newTransfers = SelectTransfersForRow(transfers, seenIds, rowDate);
 
 				if (newTransfers.Count > 0)
 				{

@@ -9,41 +9,46 @@ namespace StockPriceSheetPrintService.UnitTests
 		private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
 		[Fact]
-		public void ToTransfer_UsesPositionIdAsId_AndMapsAmountAndDate()
+		public void ToTransfers_MapsBookedTransferIdAmountAndDate()
 		{
-			var dto = JsonSerializer.Deserialize<SaxoTransaction>("""
+			var dto = JsonSerializer.Deserialize<SaxoTransactionsResponse>("""
 				{
-					"BookingId": "60247672468",
-					"PositionId": "7765187990",
-					"BookedAmount": 5000.0,
-					"IsIntradayData": false,
-					"Date": "2026-10-02"
+					"Data": [
+						{
+							"BookingId": "60247672468",
+							"PositionId": "7765187990",
+							"BookedAmount": 5000.0,
+							"IsIntradayData": false,
+							"Date": "2026-10-02"
+						}
+					]
 				}
 				""", JsonOptions)!;
 
-			var transfer = SaxoMapper.ToTransfer(dto);
+			var transfer = Assert.Single(SaxoMapper.ToTransfers(dto));
 
-			Assert.Equal("7765187990", transfer.Id);
+			Assert.Equal("60247672468", transfer.Id);
 			Assert.Equal(5000m, transfer.Amount);
 			Assert.Equal(new DateOnly(2026, 10, 2), transfer.Date);
 		}
 
 		[Fact]
-		public void ToTransfer_FallsBackToBookingId_WhenPositionIdIsMissing()
+		public void ToTransfers_SkipsIntradayTransactions()
 		{
-			var dto = JsonSerializer.Deserialize<SaxoTransaction>("""
+			var dto = JsonSerializer.Deserialize<SaxoTransactionsResponse>("""
 				{
-					"BookingId": "7765187990",
-					"IntradayAmount": 5000.0,
-					"IsIntradayData": true,
-					"Date": "2026-10-02"
+					"Data": [
+						{
+							"BookingId": "7765187990",
+							"IntradayAmount": 5000.0,
+							"IsIntradayData": true,
+							"Date": "2026-10-02"
+						}
+					]
 				}
 				""", JsonOptions)!;
 
-			var transfer = SaxoMapper.ToTransfer(dto);
-
-			Assert.Equal("7765187990", transfer.Id);
-			Assert.Equal(5000m, transfer.Amount);
+			Assert.Empty(SaxoMapper.ToTransfers(dto));
 		}
 	}
 }

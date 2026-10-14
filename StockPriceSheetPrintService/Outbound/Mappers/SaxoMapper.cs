@@ -13,13 +13,14 @@ namespace StockPriceSheetPrintService.Outbound.Mappers
 		public static AccountBalance ToAccountBalance(SaxoBalanceResponse dto) =>
 			new(dto.TotalValue, dto.CashBalance, dto.Currency, dto.CalculationAssetValue);
 
-		// Saxo giver samme overførsel to BookingId'er: et foreløbigt (intraday) på indbetalingsdagen og et endeligt
-		// dagen efter. PositionId er stabilt på tværs af begge, så det bruges som id når det findes.
 		public static Transfer ToTransfer(SaxoTransaction dto) =>
-			new(string.IsNullOrEmpty(dto.PositionId) ? dto.BookingId : dto.PositionId, dto.Amount, dto.Date);
+			new(dto.BookingId, dto.Amount, dto.Date);
 
+		// Intraday-transaktioner springes over: Saxo dokumenterer, at identifikatorer ikke er tilgængelige før
+		// transaktionen er bogført, og at overførslen får et andet BookingId når den bogføres – så den ville blive
+		// meldt to gange. Kun bogførte overførsler har det endelige BookingId.
 		public static List<Transfer> ToTransfers(SaxoTransactionsResponse dto) =>
-			dto.Data.Select(ToTransfer).ToList();
+			dto.Data.Where(t => !t.IsIntradayData).Select(ToTransfer).ToList();
 
 		public static Instrument ToInstrument(SaxoInstrument dto) => new()
 		{
