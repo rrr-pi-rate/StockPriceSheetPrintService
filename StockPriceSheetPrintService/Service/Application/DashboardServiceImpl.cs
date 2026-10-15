@@ -13,6 +13,8 @@ namespace StockPriceSheetPrintService.Service.Application
 		IHistoricalExchangeRateProvider exchangeRateProvider,
 		IExchangeRateStore exchangeRateStore,
 		IConfiguration configuration,
+		ICacheStore cache,
+		ISchedulerStatus schedulerStatus,
 		ILogger<DashboardServiceImpl> logger) : IDashboardService
 	{
 		private static readonly Dictionary<string, (string RateCurrency, decimal Divisor)> CurrencyAliases = new()
@@ -20,6 +22,9 @@ namespace StockPriceSheetPrintService.Service.Application
 			["GBp"] = ("GBP", 100m),
 			["GBX"] = ("GBP", 100m),
 		};
+
+		public const string HistoryCacheKey = "dashboard:history";
+		private static readonly TimeSpan FallbackCacheTtl = TimeSpan.FromMinutes(5);
 
 		private readonly DateOnly from = benchmarkOptions.Value.PortfolioStartDate;
 		public async Task<IReadOnlyList<BenchmarkDataPoint>> GetBenchmarkDataAsync(
@@ -124,11 +129,23 @@ namespace StockPriceSheetPrintService.Service.Application
 			return rates;
 		}
 
-		public Task<List<(DateOnly Date, decimal Value)>> GetHistoricalDataAsync(ClientContext ctx, CancellationToken ct)
+		public async Task<List<(DateOnly Date, decimal Value)>> GetHistoricalDataAsync(ClientContext ctx, CancellationToken ct)
 		{
 			var spreadsheetId = configuration["SheetsApi:SheetsKey"]
 				?? throw new InvalidOperationException("SheetsApi:SheetsKey is not configured");
-			return googleSheetsClient.GetHistoricalDataAsync(spreadsheetId, "Daily", ctx, ct);
+
+			var cached = await cache.GetAsync<List<(DateOnly Date, decimal Value)>>(HistoryCacheKey, ct);
+			if (cached is not null)
+				return cached;
+
+			var data = await googleSheetsClient.GetHistoricalDataAsync(spreadsheetId, "Daily", ctx, ct);
+
+			// Arket ændres kun af det planlagte job, som også rydder cachen efter skrivning.
+			// Udløbet er næste planlagte kørsel; er den ukendt eller passeret, bruges en kort fallback.
+			var now = DateTimeOffset.UtcNow;
+			var expiresAt = schedulerStatus.NextRunAt is { } nextRun && nextRun > now ? nextRun : now + FallbackCacheTtl;
+			await cache.SetAsync(HistoryCacheKey, data, expiresAt, ct);
+			return data;
 		}
 	}
 }

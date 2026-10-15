@@ -14,7 +14,8 @@ namespace StockPriceSheetPrintService.UnitTests
 			PortfolioReporter Reporter,
 			FakeDiscordNotifier DiscordNotifier,
 			FakeGoogleSheetsClient GoogleSheetsClient,
-			FakePendingReportStore PendingReportStore);
+			FakePendingReportStore PendingReportStore,
+			FakeCacheStore CacheStore);
 
 		private static Fixture CreateReporter(bool withSheetsKey = true)
 		{
@@ -27,15 +28,27 @@ namespace StockPriceSheetPrintService.UnitTests
 			var discordNotifier = new FakeDiscordNotifier();
 			var googleSheetsClient = new FakeGoogleSheetsClient();
 			var pendingReportStore = new FakePendingReportStore();
+			var cacheStore = new FakeCacheStore();
 
 			var reporter = new PortfolioReporter(
 				new TestLogger<PortfolioReporter>(),
 				discordNotifier,
 				googleSheetsClient,
 				configuration,
-				pendingReportStore);
+				pendingReportStore,
+				cacheStore);
 
-			return new Fixture(reporter, discordNotifier, googleSheetsClient, pendingReportStore);
+			return new Fixture(reporter, discordNotifier, googleSheetsClient, pendingReportStore, cacheStore);
+		}
+
+		[Fact]
+		public async Task UpdateGoogleSheetsAsync_ClearsDashboardHistoryCache_AfterWriting()
+		{
+			var fixture = CreateReporter();
+
+			await fixture.Reporter.UpdateGoogleSheetsAsync(new PortfolioValues(1m, 2m, 3m), Ctx, CancellationToken.None);
+
+			Assert.Equal([DashboardServiceImpl.HistoryCacheKey], fixture.CacheStore.RemovedKeys);
 		}
 
 		[Fact]

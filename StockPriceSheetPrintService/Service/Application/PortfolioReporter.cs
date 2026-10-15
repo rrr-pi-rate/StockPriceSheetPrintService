@@ -8,13 +8,15 @@ namespace StockPriceSheetPrintService.Service.Application
 		IDiscordNotifier discordNotifier,
 		IGoogleSheetsClient googleSheetsClient,
 		IConfiguration configuration,
-		IPendingReportStore pendingReportStore) : IPortfolioReporter
+		IPendingReportStore pendingReportStore,
+		ICacheStore cacheStore) : IPortfolioReporter
 	{
 		private readonly ILogger<PortfolioReporter> _logger = logger;
 		private readonly IDiscordNotifier _discordNotifier = discordNotifier;
 		private readonly IGoogleSheetsClient _googleSheetsClient = googleSheetsClient;
 		private readonly IConfiguration _configuration = configuration;
 		private readonly IPendingReportStore _pendingReportStore = pendingReportStore;
+		private readonly ICacheStore _cacheStore = cacheStore;
 
 		private const string TimeZoneId = "Central European Standard Time";
 		private const int ReportHourLocal = 7; // 07:00 lokal tid (DST håndteres automatisk af TimeZoneInfo)
@@ -88,6 +90,7 @@ namespace StockPriceSheetPrintService.Service.Application
 				}
 
 				await _googleSheetsClient.UpdateGoogleSheetsCellAsync(spreadsheetId, sheetName, values, ctx, ct);
+				await _cacheStore.RemoveAsync(DashboardServiceImpl.HistoryCacheKey, ct);
 				_logger.LogInformation("[REPORTER] Google Sheets updated with value: {value:F2} DKK", values.Total);
 			}
 			catch (Exception ex)

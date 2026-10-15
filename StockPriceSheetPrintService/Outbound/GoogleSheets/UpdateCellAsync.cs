@@ -18,9 +18,24 @@ namespace StockPriceSheetPrintService.Outbound.GoogleSheets
 		private const string CredentialsPath = "Secrets/stockprizeservice-59bc4ea3961d.json";
 		private const string ApplicationName = "HomeServerBackend";
 
-		private async Task<SheetsService> CreateServiceAsync(CancellationToken ct)
+		private readonly object _serviceLock = new();
+		private Task<SheetsService>? _serviceTask;
+
+		// Credentials indlæses og SheetsService oprettes én gang; Google-biblioteket fornyer selv access tokens.
+		// En fejlet/annulleret oprettelse caches ikke, så næste kald prøver igen.
+		private Task<SheetsService> CreateServiceAsync(CancellationToken ct)
 		{
-			var credential = (await CredentialFactory.FromFileAsync<ServiceAccountCredential>(CredentialsPath, ct))
+			lock (_serviceLock)
+			{
+				if (_serviceTask is null || _serviceTask.IsFaulted || _serviceTask.IsCanceled)
+					_serviceTask = BuildServiceAsync();
+				return _serviceTask;
+			}
+		}
+
+		private static async Task<SheetsService> BuildServiceAsync()
+		{
+			var credential = (await CredentialFactory.FromFileAsync<ServiceAccountCredential>(CredentialsPath, CancellationToken.None))
 				.ToGoogleCredential()
 				.CreateScoped(SheetsService.Scope.Spreadsheets);
 
