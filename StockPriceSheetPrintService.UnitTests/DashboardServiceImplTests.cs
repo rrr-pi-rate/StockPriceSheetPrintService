@@ -19,6 +19,8 @@ namespace StockPriceSheetPrintService.UnitTests
 			FakeBenchmarkStore BenchmarkStore,
 			FakeHistoricalExchangeRateProvider ExchangeRateProvider,
 			FakeExchangeRateStore ExchangeRateStore,
+			FakeCacheStore Cache,
+			FakeSchedulerStatus SchedulerStatus,
 			TestLogger<DashboardServiceImpl> Logger);
 
 		private static Fixture CreateService(bool withSheetsKey = true)
@@ -34,6 +36,8 @@ namespace StockPriceSheetPrintService.UnitTests
 			var benchmarkStore = new FakeBenchmarkStore();
 			var exchangeRateProvider = new FakeHistoricalExchangeRateProvider();
 			var exchangeRateStore = new FakeExchangeRateStore();
+			var cache = new FakeCacheStore();
+			var schedulerStatus = new FakeSchedulerStatus();
 			var logger = new TestLogger<DashboardServiceImpl>();
 
 			var service = new DashboardServiceImpl(
@@ -44,9 +48,11 @@ namespace StockPriceSheetPrintService.UnitTests
 				exchangeRateProvider,
 				exchangeRateStore,
 				configuration,
+				cache,
+				schedulerStatus,
 				logger);
 
-			return new Fixture(service, googleSheetsClient, yahooClient, benchmarkStore, exchangeRateProvider, exchangeRateStore, logger);
+			return new Fixture(service, googleSheetsClient, yahooClient, benchmarkStore, exchangeRateProvider, exchangeRateStore, cache, schedulerStatus, logger);
 		}
 
 		[Fact]
@@ -219,6 +225,44 @@ namespace StockPriceSheetPrintService.UnitTests
 			var result = await fixture.Service.GetHistoricalDataAsync(Ctx, CancellationToken.None);
 
 			Assert.NotNull(result);
+		}
+
+		[Fact]
+		public async Task GetHistoricalDataAsync_CachesUntilNextScheduledRun()
+		{
+			var fixture = CreateService();
+			var nextRun = DateTimeOffset.UtcNow.AddHours(5);
+			fixture.SchedulerStatus.NextRunAt = nextRun;
+			fixture.GoogleSheetsClient.HistoricalData = [(new DateOnly(2026, 1, 2), 100m)];
+
+			await fixture.Service.GetHistoricalDataAsync(Ctx, CancellationToken.None);
+
+			Assert.Equal(nextRun, fixture.Cache.Entries[DashboardServiceImpl.HistoryCacheKey].ExpiresAt);
+		}
+
+		[Fact]
+		public async Task GetHistoricalDataAsync_ReturnsCachedData_WithoutCallingGoogleSheets()
+		{
+			var fixture = CreateService();
+			List<(DateOnly Date, decimal Value)> cached = [(new DateOnly(2026, 1, 2), 100m)];
+			fixture.Cache.Entries[DashboardServiceImpl.HistoryCacheKey] = (cached, DateTimeOffset.UtcNow.AddHours(1));
+			fixture.GoogleSheetsClient.HistoricalDataException = new InvalidOperationException("Sheets must not be called");
+
+			var result = await fixture.Service.GetHistoricalDataAsync(Ctx, CancellationToken.None);
+
+			Assert.Same(cached, result);
+		}
+
+		[Fact]
+		public async Task GetHistoricalDataAsync_UsesShortFallbackTtl_WhenNextRunIsUnknown()
+		{
+			var fixture = CreateService();
+			fixture.SchedulerStatus.NextRunAt = null;
+
+			await fixture.Service.GetHistoricalDataAsync(Ctx, CancellationToken.None);
+
+			var expiresAt = fixture.Cache.Entries[DashboardServiceImpl.HistoryCacheKey].ExpiresAt;
+			Assert.InRange(expiresAt, DateTimeOffset.UtcNow.AddMinutes(4), DateTimeOffset.UtcNow.AddMinutes(6));
 		}
 
 		[Fact]

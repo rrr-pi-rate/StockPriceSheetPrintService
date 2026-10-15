@@ -31,7 +31,9 @@ namespace StockPriceSheetPrintService
 
 		public static IServiceCollection AddOutboundServices(this IServiceCollection services)
 		{
+			services.AddMemoryCache();
 			services.AddSingleton<IBenchmarkStore, DbBenchmarkStore>();
+			services.AddSingleton<ICacheStore, InMemoryCacheStore>();
 			services.AddHttpClient<IDiscordNotifier, DiscordNotifier>();
 			services.AddSingleton<IExchangeRateStore, DbExchangeRateStore>();
 			services.AddSingleton<IExecutionGuard, DbExecutionGuard>();

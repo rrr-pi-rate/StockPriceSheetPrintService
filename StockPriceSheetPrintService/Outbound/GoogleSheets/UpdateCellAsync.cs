@@ -5,6 +5,7 @@ using Google.Apis.Sheets.v4.Data;
 using StockPriceSheetPrintService.Service;
 using StockPriceSheetPrintService.Service.Models;
 using StockPriceSheetPrintService.Service.Ports.Outbound;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 
 namespace StockPriceSheetPrintService.Outbound.GoogleSheets
@@ -18,9 +19,28 @@ namespace StockPriceSheetPrintService.Outbound.GoogleSheets
 		private const string CredentialsPath = "Secrets/stockprizeservice-59bc4ea3961d.json";
 		private const string ApplicationName = "HomeServerBackend";
 
-		private async Task<SheetsService> CreateServiceAsync(CancellationToken ct)
+		private readonly object _serviceLock = new();
+		private Task<SheetsService>? _serviceTask;
+
+		// Credentials indlæses og SheetsService oprettes én gang; Google-biblioteket fornyer selv access tokens.
+		// En fejlet/annulleret oprettelse caches ikke, så næste kald prøver igen.
+		internal Func<Task<SheetsService>> ServiceFactory { get; init; } = BuildServiceAsync;
+
+		internal Task<SheetsService> CreateServiceAsync(CancellationToken ct)
 		{
-			var credential = (await CredentialFactory.FromFileAsync<ServiceAccountCredential>(CredentialsPath, ct))
+			lock (_serviceLock)
+			{
+				if (_serviceTask is null || _serviceTask.IsFaulted || _serviceTask.IsCanceled)
+					_serviceTask = ServiceFactory();
+				return _serviceTask;
+			}
+		}
+
+		// Læser den hemmelige credentials-fil, så den kan ikke køres i CI – ServiceFactory erstattes i tests.
+		[ExcludeFromCodeCoverage]
+		private static async Task<SheetsService> BuildServiceAsync()
+		{
+			var credential = (await CredentialFactory.FromFileAsync<ServiceAccountCredential>(CredentialsPath, CancellationToken.None))
 				.ToGoogleCredential()
 				.CreateScoped(SheetsService.Scope.Spreadsheets);
 
