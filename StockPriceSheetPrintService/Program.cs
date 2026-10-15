@@ -15,7 +15,17 @@ using StockPriceSheetPrintService.Service.Models;
 var errorWebhook = Environment.GetEnvironmentVariable("Discord__WebhookError")
 	?? throw new InvalidOperationException("Discord:WebhookError missing");
 
+var logConfig = new ConfigurationBuilder()
+	.AddJsonFile("appsettings.json", optional: true)
+	.AddEnvironmentVariables()
+	.Build();
+
 Log.Logger = new LoggerConfiguration()
+	.MinimumLevel.Information()
+	.MinimumLevel.Override("Microsoft.AspNetCore", LogEventLevel.Warning)
+	.MinimumLevel.Override("Microsoft.EntityFrameworkCore", LogEventLevel.Warning)
+	.MinimumLevel.Override("System.Net.Http.HttpClient", LogEventLevel.Warning)
+	.ReadFrom.Configuration(logConfig)
 	.Enrich.FromLogContext()
 	.Filter.ByExcluding(IsMetricsScrape)
 	.WriteTo.Console(new Serilog.Formatting.Json.JsonFormatter())
@@ -78,6 +88,7 @@ if (app.Environment.IsDevelopment())
 	app.MapOpenApi();
 }
 
+app.UseSerilogRequestLogging();
 app.UseMiddleware<KirbyVisitTrackingMiddleware>();
 app.UseAuthorization();
 app.MapMetrics();
