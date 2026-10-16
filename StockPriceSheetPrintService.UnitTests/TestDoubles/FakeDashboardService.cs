@@ -19,9 +19,9 @@ namespace StockPriceSheetPrintService.UnitTests.TestDoubles
 		public Task<List<(DateOnly Date, decimal Value)>> GetHistoricalDataAsync(ClientContext ctx, CancellationToken ct) =>
 			Task.FromResult(Entries);
 
-		public Task<IReadOnlyList<Transfer>> GetTransactionsAsync(ClientContext ctx, CancellationToken ct)
-		{
-			throw new NotSupportedException("Not used by these tests");
-		}
+		public IReadOnlyList<Transfer> Transactions { get; set; } = [];
+
+		public Task<IReadOnlyList<Transfer>> GetTransactionsAsync(ClientContext ctx, CancellationToken ct) =>
+			Task.FromResult(Transactions);
 	}
 }

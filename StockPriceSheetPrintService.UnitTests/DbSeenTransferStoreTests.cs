@@ -76,5 +76,16 @@ namespace StockPriceSheetPrintService.UnitTests
 			var ids = await store.LoadAsync(CancellationToken.None);
 			Assert.Equal(new HashSet<string> { "old", "new" }, ids);
 		}
+
+		[Fact]
+		public async Task GetTransactionsAsync_ReturnsAllTransfersOrderedByDate()
+		{
+			var store = new DbSeenTransferStore(new InMemoryDbContextFactory());
+			await store.SaveAsync([new Transfer("b", 250m, Day), new Transfer("a", 100m, Day.AddDays(-5))], CancellationToken.None);
+
+			var transfers = await store.GetTransactionsAsync(CancellationToken.None);
+
+			Assert.Equal([new Transfer("a", 100m, Day.AddDays(-5)), new Transfer("b", 250m, Day)], transfers);
+		}
 	}
 }

@@ -83,7 +83,7 @@ namespace StockPriceSheetPrintService.Service.Application
 					}
 					else
 					{
-						// ingen kurs overhovedet i nærheden — spring punktet over
+						// ingen kurs overhovedet i nÃ¦rheden â€” spring punktet over
 						missingDates.Add(date);
 						continue;
 					}
@@ -141,8 +141,8 @@ namespace StockPriceSheetPrintService.Service.Application
 
 			var data = await googleSheetsClient.GetHistoricalDataAsync(spreadsheetId, "Daily", ctx, ct);
 
-			// Arket ændres kun af det planlagte job, som også rydder cachen efter skrivning.
-			// Udløbet er næste planlagte kørsel; er den ukendt eller passeret, bruges en kort fallback.
+			// Arket Ã¦ndres kun af det planlagte job, som ogsÃ¥ rydder cachen efter skrivning.
+			// UdlÃ¸bet er nÃ¦ste planlagte kÃ¸rsel; er den ukendt eller passeret, bruges en kort fallback.
 			var now = DateTimeOffset.UtcNow;
 			var expiresAt = schedulerStatus.NextRunAt is { } nextRun && nextRun > now ? nextRun : now + FallbackCacheTtl;
 			await cache.SetAsync(HistoryCacheKey, data, expiresAt, ct);
@@ -151,9 +151,7 @@ namespace StockPriceSheetPrintService.Service.Application
 
 		public async Task<IReadOnlyList<Transfer>> GetTransactionsAsync(ClientContext ctx, CancellationToken ct)
 		{
-			// Implement cacheing for transactions similar to historical data, if needed.
-			var seenTransfers = await seenTransferStore.GetTransactionsAsync(ct);
-			return [.. seenTransfers.Select(t => new Transfer(t.BookingId, t.Amount, t.Date))];
+			return await seenTransferStore.GetTransactionsAsync(ct);
 		}
 	}
 }

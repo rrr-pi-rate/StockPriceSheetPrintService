@@ -39,9 +39,9 @@ namespace StockPriceSheetPrintService.Inbound.Controllers
 			return Ok(payload);
 		}
 
-        [HttpGet("transactions")]
-        [ProducesResponseType(typeof(List<DashboardTransactionDto>), StatusCodes.Status200OK)]
-        public async Task<IActionResult> GetTransactions(CancellationToken ct)
+		[HttpGet("transactions")]
+		[ProducesResponseType(typeof(List<DashboardTransactionDto>), StatusCodes.Status200OK)]
+		public async Task<IActionResult> GetTransactions(CancellationToken ct)
 		{
 			var ctx = ClientContextFactory.New("HTTP:dashboard-transactions");
 			using var _1 = LogContext.PushProperty("CorrelationId", ctx.CorrelationId);
@@ -50,9 +50,9 @@ namespace StockPriceSheetPrintService.Inbound.Controllers
 			var transactions = await dashboardService.GetTransactionsAsync(ctx, ct);
 			
 			var payload = transactions.Select(t => new DashboardTransactionDto(
-				t.Date.ToString("yyyy-MM-dd"),
+				t.Id,
 				t.Amount,
-				t.Date)).ToList();
+				t.Date.ToString("yyyy-MM-dd"))).ToList();
 
 			return Ok(payload);
 		}

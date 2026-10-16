@@ -27,11 +27,15 @@ namespace StockPriceSheetPrintService.Outbound.Persistence
 			await db.SaveChangesAsync(ct);
 		}
 
-		public async Task<List<SeenTransferEntity>> GetTransactionsAsync(CancellationToken ct)
+		public async Task<List<Transfer>> GetTransactionsAsync(CancellationToken ct)
 		{
 			await using var db = await dbFactory.CreateDbContextAsync(ct);
 
-			return await db.SeenTransfers.ToListAsync(ct);
+			return await db.SeenTransfers
+				.OrderBy(e => e.Date)
+				.ThenBy(e => e.BookingId)
+				.Select(e => new Transfer(e.BookingId, e.Amount, e.Date))
+				.ToListAsync(ct);
 		}
 	}
 }

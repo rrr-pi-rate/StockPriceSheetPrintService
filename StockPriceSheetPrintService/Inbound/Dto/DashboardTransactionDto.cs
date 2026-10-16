@@ -1,4 +1,4 @@
-﻿namespace StockPriceSheetPrintService.Inbound.Dto
+namespace StockPriceSheetPrintService.Inbound.Dto
 {
-	public record DashboardTransactionDto(string BookingId, decimal Amount, DateOnly Date);
+	public record DashboardTransactionDto(string BookingId, decimal Amount, string Date);
 }
