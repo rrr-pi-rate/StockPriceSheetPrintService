@@ -6,6 +6,7 @@ namespace StockPriceSheetPrintService.Service.Ports.Inbound
 	{
 		Task<List<(DateOnly Date, decimal Value)>> GetHistoricalDataAsync(ClientContext ctx, CancellationToken ct);
 		Task<IReadOnlyList<BenchmarkDataPoint>> GetBenchmarkDataAsync(string symbol, ClientContext ctx, CancellationToken ct);
+		Task<IReadOnlyList<BenchmarkDataPoint>> GetInflationDataAsync(ClientContext ctx, CancellationToken ct);
 		Task<IReadOnlyList<Transfer>> GetTransactionsAsync(ClientContext ctx, CancellationToken ct);
 	}
 }

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using Serilog.Context;
 using StockPriceSheetPrintService.Inbound.Dto;
 using StockPriceSheetPrintService.Service;
+using StockPriceSheetPrintService.Service.Exceptions;
 using StockPriceSheetPrintService.Service.Ports.Inbound;
 
 namespace StockPriceSheetPrintService.Inbound.Controllers
@@ -37,6 +38,32 @@ namespace StockPriceSheetPrintService.Inbound.Controllers
 				e.Value)).ToList();
 
 			return Ok(payload);
+		}
+
+		/// <summary>
+		/// Rå månedlige forbrugerprisindeks-værdier (Danmarks Statistik PRIS01). `date` er første dag i den måned indekset gælder for.
+		/// </summary>
+		[HttpGet("inflation")]
+		[ProducesResponseType(typeof(List<BenchmarkDataPointDto>), StatusCodes.Status200OK)]
+		[ProducesResponseType(StatusCodes.Status502BadGateway)]
+		public async Task<IActionResult> GetInflationData(CancellationToken ct)
+		{
+			var ctx = ClientContextFactory.New("HTTP:dashboard-inflation");
+			using var _1 = LogContext.PushProperty("CorrelationId", ctx.CorrelationId);
+			using var _2 = LogContext.PushProperty("Source", ctx.Source);
+
+			try
+			{
+				var entries = await dashboardService.GetInflationDataAsync(ctx, ct);
+				var payload = entries.Select(e => new BenchmarkDataPointDto(
+					e.Date.ToString("yyyy-MM-dd"),
+					e.Value)).ToList();
+				return Ok(payload);
+			}
+			catch (InflationUnavailableException)
+			{
+				return StatusCode(StatusCodes.Status502BadGateway);
+			}
 		}
 
 		[HttpGet("transactions")]

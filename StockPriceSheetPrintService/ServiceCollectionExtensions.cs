@@ -8,6 +8,7 @@ using StockPriceSheetPrintService.Outbound.MarketStack;
 using StockPriceSheetPrintService.Outbound.Memory;
 using StockPriceSheetPrintService.Outbound.Persistence;
 using StockPriceSheetPrintService.Outbound.Saxo;
+using StockPriceSheetPrintService.Outbound.Statbank;
 using StockPriceSheetPrintService.Outbound.YahooFinance;
 using StockPriceSheetPrintService.Service.Application;
 using StockPriceSheetPrintService.Service.Ports.Inbound;
@@ -37,6 +38,11 @@ namespace StockPriceSheetPrintService
 			services.AddHttpClient<IDiscordNotifier, DiscordNotifier>();
 			services.AddSingleton<IExchangeRateStore, DbExchangeRateStore>();
 			services.AddSingleton<IExecutionGuard, DbExecutionGuard>();
+			services.AddSingleton<IInflationStore, DbInflationStore>();
+			services.AddHttpClient<IInflationIndexProvider, StatbankInflationClient>(client =>
+			{
+				client.BaseAddress = new Uri("https://api.statbank.dk/");
+			});
 			services.AddScoped<IGeminiReportInsights, GeminiReportInsightsImpl>();
 			services.AddSingleton<IGeminiToggle, DbGeminiToggleStore>();
 			services.AddSingleton<IGoogleSheetsClient, GoogleSheetsClientImpl>();

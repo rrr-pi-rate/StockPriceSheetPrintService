@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Options;
+using StockPriceSheetPrintService.Service.Exceptions;
 using StockPriceSheetPrintService.Service.Models;
 using StockPriceSheetPrintService.Service.Ports.Inbound;
 using StockPriceSheetPrintService.Service.Ports.Outbound;
@@ -16,6 +17,8 @@ namespace StockPriceSheetPrintService.Service.Application
 		ICacheStore cache,
 		ISchedulerStatus schedulerStatus,
 		ISeenTransferStore seenTransferStore,
+		IInflationIndexProvider inflationProvider,
+		IInflationStore inflationStore,
 		ILogger<DashboardServiceImpl> logger) : IDashboardService
 	{
 		private static readonly Dictionary<string, (string RateCurrency, decimal Divisor)> CurrencyAliases = new()
@@ -146,6 +149,29 @@ namespace StockPriceSheetPrintService.Service.Application
 			var now = DateTimeOffset.UtcNow;
 			var expiresAt = schedulerStatus.NextRunAt is { } nextRun && nextRun > now ? nextRun : now + FallbackCacheTtl;
 			await cache.SetAsync(HistoryCacheKey, data, expiresAt, ct);
+			return data;
+		}
+
+		public async Task<IReadOnlyList<BenchmarkDataPoint>> GetInflationDataAsync(ClientContext ctx, CancellationToken ct)
+		{
+			// Indekset udgives månedligt (ca. d. 10.), så én refresh pr. dag er rigeligt.
+			var lastFetchedAt = await inflationStore.GetLastFetchedAtAsync(ct);
+			var isStale = lastFetchedAt is null || DateOnly.FromDateTime(lastFetchedAt.Value.UtcDateTime) < DateOnly.FromDateTime(DateTime.UtcNow);
+
+			if (isStale)
+			{
+				var fetched = await inflationProvider.GetConsumerPriceIndexAsync(ctx, ct);
+				if (fetched is not null)
+					await inflationStore.UpsertAsync(fetched, ct);
+				else
+					logger.LogWarning("[INFLATION] Refresh failed - serving cached data if any - ClientContext {ctx}", ctx);
+			}
+
+			// Ingen fallback-tal: er der hverken friske eller tidligere hentede værdier, returneres en fejl.
+			var data = await inflationStore.GetCachedDataAsync(ct);
+			if (data.Count == 0)
+				throw new InflationUnavailableException("Consumer price index is unavailable");
+
 			return data;
 		}
 
