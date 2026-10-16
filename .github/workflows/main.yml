@@ -10,7 +10,10 @@ on:
       - master
 jobs:
   build:
-    runs-on: self-hosted
+    # GitHub-hosted: this job runs code from pull requests, so it must never run on the
+    # self-hosted runner (the Raspberry Pi), which has root and access to the home network.
+    runs-on: ubuntu-latest
+    # Fork PRs have no SONAR_TOKEN, so the Sonar steps would fail; skip them (not a security guard).
     if: github.event_name == 'push' || github.event_name == 'merge_group' || github.event.pull_request.head.repo.full_name == github.repository
     permissions:
       contents: read
