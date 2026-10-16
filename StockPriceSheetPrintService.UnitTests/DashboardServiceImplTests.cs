@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 using StockPriceSheetPrintService.Service;
 using StockPriceSheetPrintService.Service.Application;
+using StockPriceSheetPrintService.Service.Exceptions;
 using StockPriceSheetPrintService.Service.Models;
 using StockPriceSheetPrintService.UnitTests.TestDoubles;
 
@@ -22,7 +23,9 @@ namespace StockPriceSheetPrintService.UnitTests
 			FakeCacheStore Cache,
 			FakeSchedulerStatus SchedulerStatus,
 			FakeSeenTransferStore SeenTransferStore,
-			TestLogger<DashboardServiceImpl> Logger);
+			TestLogger<DashboardServiceImpl> Logger,
+			FakeInflationIndexProvider InflationProvider,
+			FakeInflationStore InflationStore);
 
 		private static Fixture CreateService(bool withSheetsKey = true)
 		{
@@ -38,6 +41,8 @@ namespace StockPriceSheetPrintService.UnitTests
 			var exchangeRateProvider = new FakeHistoricalExchangeRateProvider();
 			var exchangeRateStore = new FakeExchangeRateStore();
 			var cache = new FakeCacheStore();
+			var inflationProvider = new FakeInflationIndexProvider();
+			var inflationStore = new FakeInflationStore();
 			var schedulerStatus = new FakeSchedulerStatus();
 			var seenTransferStore = new FakeSeenTransferStore();
 			var logger = new TestLogger<DashboardServiceImpl>();
@@ -53,9 +58,58 @@ namespace StockPriceSheetPrintService.UnitTests
 				cache,
 				schedulerStatus,
 				seenTransferStore,
+				inflationProvider,
+				inflationStore,
 				logger);
 
-			return new Fixture(service, googleSheetsClient, yahooClient, benchmarkStore, exchangeRateProvider, exchangeRateStore, cache, schedulerStatus, seenTransferStore, logger);
+			return new Fixture(service, googleSheetsClient, yahooClient, benchmarkStore, exchangeRateProvider, exchangeRateStore, cache, schedulerStatus, seenTransferStore, logger, inflationProvider, inflationStore);
+		}
+
+		[Fact]
+		public async Task GetInflationDataAsync_FetchesAndCaches_WhenStoreIsEmpty()
+		{
+			var fixture = CreateService();
+			fixture.InflationProvider.PointsToReturn = [new BenchmarkDataPoint(new DateTime(2026, 9, 1), 102.6)];
+
+			var result = await fixture.Service.GetInflationDataAsync(Ctx, CancellationToken.None);
+
+			Assert.Equal(102.6, Assert.Single(result).Value);
+			Assert.Equal(1, fixture.InflationProvider.CallCount);
+		}
+
+		[Fact]
+		public async Task GetInflationDataAsync_DoesNotRefetch_WhenFetchedToday()
+		{
+			var fixture = CreateService();
+			fixture.InflationStore.Data.Add(new BenchmarkDataPoint(new DateTime(2026, 9, 1), 102.6));
+			fixture.InflationStore.LastFetchedAt = DateTimeOffset.UtcNow;
+
+			await fixture.Service.GetInflationDataAsync(Ctx, CancellationToken.None);
+
+			Assert.Equal(0, fixture.InflationProvider.CallCount);
+		}
+
+		[Fact]
+		public async Task GetInflationDataAsync_ServesCachedData_WhenRefreshFails()
+		{
+			var fixture = CreateService();
+			fixture.InflationStore.Data.Add(new BenchmarkDataPoint(new DateTime(2026, 8, 1), 102.0));
+			fixture.InflationStore.LastFetchedAt = DateTimeOffset.UtcNow.AddDays(-2);
+			fixture.InflationProvider.PointsToReturn = null;
+
+			var result = await fixture.Service.GetInflationDataAsync(Ctx, CancellationToken.None);
+
+			Assert.Equal(102.0, Assert.Single(result).Value);
+		}
+
+		[Fact]
+		public async Task GetInflationDataAsync_Throws_WhenFetchFailsAndNothingCached()
+		{
+			var fixture = CreateService();
+			fixture.InflationProvider.PointsToReturn = null;
+
+			await Assert.ThrowsAsync<InflationUnavailableException>(() =>
+				fixture.Service.GetInflationDataAsync(Ctx, CancellationToken.None));
 		}
 
 		[Fact]

@@ -1,4 +1,5 @@
 using StockPriceSheetPrintService.Service;
+using StockPriceSheetPrintService.Service.Exceptions;
 using StockPriceSheetPrintService.Service.Models;
 using StockPriceSheetPrintService.Service.Ports.Inbound;
 
@@ -18,6 +19,14 @@ namespace StockPriceSheetPrintService.UnitTests.TestDoubles
 
 		public Task<List<(DateOnly Date, decimal Value)>> GetHistoricalDataAsync(ClientContext ctx, CancellationToken ct) =>
 			Task.FromResult(Entries);
+
+		public IReadOnlyList<BenchmarkDataPoint> InflationPoints { get; set; } = [];
+		public bool InflationUnavailable { get; set; }
+
+		public Task<IReadOnlyList<BenchmarkDataPoint>> GetInflationDataAsync(ClientContext ctx, CancellationToken ct) =>
+			InflationUnavailable
+				? throw new InflationUnavailableException("unavailable")
+				: Task.FromResult(InflationPoints);
 
 		public IReadOnlyList<Transfer> Transactions { get; set; } = [];
 

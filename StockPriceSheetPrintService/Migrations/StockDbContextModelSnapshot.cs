@@ -89,6 +89,22 @@ namespace StockPriceSheetPrintService.Migrations
                     b.ToTable("GeminiToggle");
                 });
 
+            modelBuilder.Entity("StockPriceSheetPrintService.Outbound.Persistence.Entities.InflationIndexEntity", b =>
+                {
+                    b.Property<DateOnly>("Month")
+                        .HasColumnType("date");
+
+                    b.Property<DateTimeOffset>("FetchedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<double>("IndexValue")
+                        .HasColumnType("double precision");
+
+                    b.HasKey("Month");
+
+                    b.ToTable("InflationIndex");
+                });
+
             modelBuilder.Entity("StockPriceSheetPrintService.Outbound.Persistence.Entities.JuneSharesEntity", b =>
                 {
                     b.Property<int>("Id")

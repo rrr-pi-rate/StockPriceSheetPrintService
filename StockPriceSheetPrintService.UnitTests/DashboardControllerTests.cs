@@ -90,6 +90,33 @@ namespace StockPriceSheetPrintService.UnitTests
 		}
 
 		[Fact]
+		public async Task GetInflationData_ReturnsOk_WithMonthlyPointsMappedToDtos()
+		{
+			var dashboardService = new FakeDashboardService
+			{
+				InflationPoints = [new BenchmarkDataPoint(new DateTime(2026, 9, 1), 102.6)]
+			};
+			var controller = new DashboardController(dashboardService);
+
+			var result = await controller.GetInflationData(CancellationToken.None);
+
+			var okResult = Assert.IsType<OkObjectResult>(result);
+			var dto = Assert.Single(Assert.IsType<List<BenchmarkDataPointDto>>(okResult.Value));
+			Assert.Equal("2026-09-01", dto.Date);
+			Assert.Equal(102.6, dto.Value);
+		}
+
+		[Fact]
+		public async Task GetInflationData_Returns502_WhenInflationIsUnavailable()
+		{
+			var controller = new DashboardController(new FakeDashboardService { InflationUnavailable = true });
+
+			var result = await controller.GetInflationData(CancellationToken.None);
+
+			Assert.Equal(502,Assert.IsType<StatusCodeResult>(result).StatusCode);
+		}
+
+		[Fact]
 		public async Task GetBenchmarkData_ReturnsOk_WithEmptyList_WhenNoBenchmarkDataExists()
 		{
 			var dashboardService = new FakeDashboardService { BenchmarkPoints = [] };
