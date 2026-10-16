@@ -1,0 +1,36 @@
+name: CodeQL
+on:
+  pull_request:
+    branches:
+      - master
+  # Required by GitHub merge queue: checks must also run on the queue's temporary branches
+  merge_group:
+  push:
+    branches:
+      - master
+  schedule:
+    - cron: '0 5 * * 1'
+jobs:
+  # Job names "Analyze (actions)" / "Analyze (csharp)" are required checks in the MergeRuleSet ruleset
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: [actions, csharp]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: /language:${{ matrix.language }}
