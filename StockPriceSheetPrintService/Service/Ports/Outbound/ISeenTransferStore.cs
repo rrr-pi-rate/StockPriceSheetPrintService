@@ -6,5 +6,6 @@ namespace StockPriceSheetPrintService.Service.Ports.Outbound
 	{
 		Task<HashSet<string>> LoadAsync(CancellationToken ct);
 		Task SaveAsync(IEnumerable<Transfer> newTransfers, CancellationToken ct);
+		Task<List<Transfer>> GetTransactionsAsync(CancellationToken ct);
 	}
 }

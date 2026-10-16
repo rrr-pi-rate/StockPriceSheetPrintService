@@ -46,6 +46,25 @@ namespace StockPriceSheetPrintService.UnitTests
 		}
 
 		[Fact]
+		public async Task GetTransactions_ReturnsOk_WithDtosMappedFromTransfers()
+		{
+			var dashboardService = new FakeDashboardService
+			{
+				Transactions = [new Transfer("booking-1", 5000m, new DateOnly(2026, 1, 2))]
+			};
+			var controller = new DashboardController(dashboardService);
+
+			var result = await controller.GetTransactions(CancellationToken.None);
+
+			var okResult = Assert.IsType<OkObjectResult>(result);
+			var payload = Assert.IsType<List<DashboardTransactionDto>>(okResult.Value);
+			var dto = Assert.Single(payload);
+			Assert.Equal("booking-1", dto.BookingId);
+			Assert.Equal(5000m, dto.Amount);
+			Assert.Equal("2026-01-02", dto.Date);
+		}
+
+		[Fact]
 		public async Task GetBenchmarkData_ReturnsOk_WithBenchmarkDataPointDtosMappedFromEntries()
 		{
 			var dashboardService = new FakeDashboardService

@@ -37,6 +37,10 @@ namespace StockPriceSheetPrintService.UnitTests.TestDoubles
 		public HashSet<string> Seen { get; set; } = [];
 		public List<Transfer> Saved { get; } = [];
 
+		public List<Transfer> Transactions { get; set; } = [];
+
+		public Task<List<Transfer>> GetTransactionsAsync(CancellationToken ct) => Task.FromResult(Transactions);
+
 		public Task<HashSet<string>> LoadAsync(CancellationToken ct) => Task.FromResult(Seen);
 		public Task SaveAsync(IEnumerable<Transfer> newTransfers, CancellationToken ct)
 		{

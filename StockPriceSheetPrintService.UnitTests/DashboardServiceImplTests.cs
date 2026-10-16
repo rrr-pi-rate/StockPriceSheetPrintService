@@ -21,6 +21,7 @@ namespace StockPriceSheetPrintService.UnitTests
 			FakeExchangeRateStore ExchangeRateStore,
 			FakeCacheStore Cache,
 			FakeSchedulerStatus SchedulerStatus,
+			FakeSeenTransferStore SeenTransferStore,
 			TestLogger<DashboardServiceImpl> Logger);
 
 		private static Fixture CreateService(bool withSheetsKey = true)
@@ -28,7 +29,7 @@ namespace StockPriceSheetPrintService.UnitTests
 			var configuration = new ConfigurationBuilder()
 				.AddInMemoryCollection(withSheetsKey
 					? new Dictionary<string, string?> { ["SheetsApi:SheetsKey"] = "sheet-123" }
-					: new Dictionary<string, string?>())
+					: [])
 				.Build();
 
 			var googleSheetsClient = new FakeGoogleSheetsClient();
@@ -38,6 +39,7 @@ namespace StockPriceSheetPrintService.UnitTests
 			var exchangeRateStore = new FakeExchangeRateStore();
 			var cache = new FakeCacheStore();
 			var schedulerStatus = new FakeSchedulerStatus();
+			var seenTransferStore = new FakeSeenTransferStore();
 			var logger = new TestLogger<DashboardServiceImpl>();
 
 			var service = new DashboardServiceImpl(
@@ -50,9 +52,22 @@ namespace StockPriceSheetPrintService.UnitTests
 				configuration,
 				cache,
 				schedulerStatus,
+				seenTransferStore,
 				logger);
 
-			return new Fixture(service, googleSheetsClient, yahooClient, benchmarkStore, exchangeRateProvider, exchangeRateStore, cache, schedulerStatus, logger);
+			return new Fixture(service, googleSheetsClient, yahooClient, benchmarkStore, exchangeRateProvider, exchangeRateStore, cache, schedulerStatus, seenTransferStore, logger);
+		}
+
+		[Fact]
+		public async Task GetTransactionsAsync_ReturnsTransfersFromSeenTransferStore()
+		{
+			var fixture = CreateService();
+			var expected = new Transfer("a", 100m, new DateOnly(2026, 1, 2));
+			fixture.SeenTransferStore.Transactions = [expected];
+
+			var result = await fixture.Service.GetTransactionsAsync(Ctx, CancellationToken.None);
+
+			Assert.Equal(expected, Assert.Single(result));
 		}
 
 		[Fact]

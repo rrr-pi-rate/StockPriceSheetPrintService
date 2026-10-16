@@ -18,5 +18,10 @@ namespace StockPriceSheetPrintService.UnitTests.TestDoubles
 
 		public Task<List<(DateOnly Date, decimal Value)>> GetHistoricalDataAsync(ClientContext ctx, CancellationToken ct) =>
 			Task.FromResult(Entries);
+
+		public IReadOnlyList<Transfer> Transactions { get; set; } = [];
+
+		public Task<IReadOnlyList<Transfer>> GetTransactionsAsync(ClientContext ctx, CancellationToken ct) =>
+			Task.FromResult(Transactions);
 	}
 }

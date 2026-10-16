@@ -15,6 +15,7 @@ namespace StockPriceSheetPrintService.Service.Application
 		IConfiguration configuration,
 		ICacheStore cache,
 		ISchedulerStatus schedulerStatus,
+		ISeenTransferStore seenTransferStore,
 		ILogger<DashboardServiceImpl> logger) : IDashboardService
 	{
 		private static readonly Dictionary<string, (string RateCurrency, decimal Divisor)> CurrencyAliases = new()
@@ -82,7 +83,7 @@ namespace StockPriceSheetPrintService.Service.Application
 					}
 					else
 					{
-						// ingen kurs overhovedet i nærheden — spring punktet over
+						// ingen kurs overhovedet i nÃ¦rheden â€” spring punktet over
 						missingDates.Add(date);
 						continue;
 					}
@@ -140,12 +141,17 @@ namespace StockPriceSheetPrintService.Service.Application
 
 			var data = await googleSheetsClient.GetHistoricalDataAsync(spreadsheetId, "Daily", ctx, ct);
 
-			// Arket ændres kun af det planlagte job, som også rydder cachen efter skrivning.
-			// Udløbet er næste planlagte kørsel; er den ukendt eller passeret, bruges en kort fallback.
+			// Arket Ã¦ndres kun af det planlagte job, som ogsÃ¥ rydder cachen efter skrivning.
+			// UdlÃ¸bet er nÃ¦ste planlagte kÃ¸rsel; er den ukendt eller passeret, bruges en kort fallback.
 			var now = DateTimeOffset.UtcNow;
 			var expiresAt = schedulerStatus.NextRunAt is { } nextRun && nextRun > now ? nextRun : now + FallbackCacheTtl;
 			await cache.SetAsync(HistoryCacheKey, data, expiresAt, ct);
 			return data;
+		}
+
+		public async Task<IReadOnlyList<Transfer>> GetTransactionsAsync(ClientContext ctx, CancellationToken ct)
+		{
+			return await seenTransferStore.GetTransactionsAsync(ct);
 		}
 	}
 }

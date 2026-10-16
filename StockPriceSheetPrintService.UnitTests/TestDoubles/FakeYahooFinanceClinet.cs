@@ -1,9 +1,6 @@
 ﻿using StockPriceSheetPrintService.Service;
 using StockPriceSheetPrintService.Service.Models;
 using StockPriceSheetPrintService.Service.Ports.Outbound;
-using System;
-using System.Collections.Generic;
-using System.Text;
 
 namespace StockPriceSheetPrintService.UnitTests.TestDoubles
 {

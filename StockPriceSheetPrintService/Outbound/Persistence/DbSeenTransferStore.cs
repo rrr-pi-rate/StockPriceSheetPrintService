@@ -10,6 +10,7 @@ namespace StockPriceSheetPrintService.Outbound.Persistence
 		public async Task<HashSet<string>> LoadAsync(CancellationToken ct)
 		{
 			await using var db = await dbFactory.CreateDbContextAsync(ct);
+
 			return await db.SeenTransfers
 				.Select(e => e.BookingId)
 				.ToHashSetAsync(ct);
@@ -24,6 +25,17 @@ namespace StockPriceSheetPrintService.Outbound.Persistence
 				db.SeenTransfers.Add(new SeenTransferEntity { BookingId = t.Id, Amount = t.Amount, Date = t.Date });
 
 			await db.SaveChangesAsync(ct);
+		}
+
+		public async Task<List<Transfer>> GetTransactionsAsync(CancellationToken ct)
+		{
+			await using var db = await dbFactory.CreateDbContextAsync(ct);
+
+			return await db.SeenTransfers
+				.OrderBy(e => e.Date)
+				.ThenBy(e => e.BookingId)
+				.Select(e => new Transfer(e.BookingId, e.Amount, e.Date))
+				.ToListAsync(ct);
 		}
 	}
 }
