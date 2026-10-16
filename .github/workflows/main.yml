@@ -3,6 +3,7 @@ on:
   pull_request:
     branches:
       - master
+  # Required by GitHub merge queue: checks must also run on the queue's temporary branches
   merge_group:
   push:
     branches:
