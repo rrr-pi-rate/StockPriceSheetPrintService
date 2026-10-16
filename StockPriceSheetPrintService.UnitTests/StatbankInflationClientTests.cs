@@ -34,6 +34,30 @@ namespace StockPriceSheetPrintService.UnitTests
 		}
 
 		[Fact]
+		public void ParseCsv_SkipsMalformedRows_AndOrdersByDate()
+		{
+			const string csv = "\"TID\";\"INDHOLD\"\n\"2026M09\";\"102,6\"\n\"2025M09\";\"100,41\"\n2026M13;101,0\n2026-09;101,0\n2026M08;abc\nkort\n";
+
+			var points = StatbankInflationClient.ParseCsv(csv);
+
+			Assert.Equal(2, points.Count);
+			Assert.Equal(new DateTime(2025, 9, 1), points[0].Date);
+			Assert.Equal(new DateTime(2026, 9, 1), points[1].Date);
+		}
+
+		[Fact]
+		public void ParseCsv_ReturnsEmpty_WhenHeaderLacksRequiredColumns()
+		{
+			Assert.Empty(StatbankInflationClient.ParseCsv("A;B\n1;2\n"));
+		}
+
+		[Fact]
+		public void ParseCsv_ReturnsEmpty_WhenOnlyHeaderPresent()
+		{
+			Assert.Empty(StatbankInflationClient.ParseCsv("TID;INDHOLD"));
+		}
+
+		[Fact]
 		public async Task GetConsumerPriceIndexAsync_ReturnsNull_OnHttpError()
 		{
 			var result = await CreateClient(HttpStatusCode.InternalServerError, "").GetConsumerPriceIndexAsync(Ctx, CancellationToken.None);
