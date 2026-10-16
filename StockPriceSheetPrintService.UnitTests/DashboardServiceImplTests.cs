@@ -28,7 +28,7 @@ namespace StockPriceSheetPrintService.UnitTests
 			var configuration = new ConfigurationBuilder()
 				.AddInMemoryCollection(withSheetsKey
 					? new Dictionary<string, string?> { ["SheetsApi:SheetsKey"] = "sheet-123" }
-					: new Dictionary<string, string?>())
+					: [])
 				.Build();
 
 			var googleSheetsClient = new FakeGoogleSheetsClient();

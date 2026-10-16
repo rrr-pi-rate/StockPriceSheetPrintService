@@ -15,6 +15,7 @@ namespace StockPriceSheetPrintService.Service.Application
 		IConfiguration configuration,
 		ICacheStore cache,
 		ISchedulerStatus schedulerStatus,
+		ISeenTransferStore seenTransferStore,
 		ILogger<DashboardServiceImpl> logger) : IDashboardService
 	{
 		private static readonly Dictionary<string, (string RateCurrency, decimal Divisor)> CurrencyAliases = new()
@@ -146,6 +147,13 @@ namespace StockPriceSheetPrintService.Service.Application
 			var expiresAt = schedulerStatus.NextRunAt is { } nextRun && nextRun > now ? nextRun : now + FallbackCacheTtl;
 			await cache.SetAsync(HistoryCacheKey, data, expiresAt, ct);
 			return data;
+		}
+
+		public async Task<IReadOnlyList<Transfer>> GetTransactionsAsync(ClientContext ctx, CancellationToken ct)
+		{
+			// Implement cacheing for transactions similar to historical data, if needed.
+			var seenTransfers = await seenTransferStore.GetTransactionsAsync(ct);
+			return [.. seenTransfers.Select(t => new Transfer(t.BookingId, t.Amount, t.Date))];
 		}
 	}
 }

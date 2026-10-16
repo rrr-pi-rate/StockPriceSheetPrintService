@@ -1,3 +1,4 @@
+using StockPriceSheetPrintService.Outbound.Persistence.Entities;
 using StockPriceSheetPrintService.Service;
 using StockPriceSheetPrintService.Service.Models;
 using StockPriceSheetPrintService.Service.Ports.Outbound;
@@ -36,6 +37,11 @@ namespace StockPriceSheetPrintService.UnitTests.TestDoubles
 	{
 		public HashSet<string> Seen { get; set; } = [];
 		public List<Transfer> Saved { get; } = [];
+
+		public Task<List<SeenTransferEntity>> GetTransactionsAsync(CancellationToken ct)
+		{
+			throw new NotSupportedException("Not used by these tests");
+		}
 
 		public Task<HashSet<string>> LoadAsync(CancellationToken ct) => Task.FromResult(Seen);
 		public Task SaveAsync(IEnumerable<Transfer> newTransfers, CancellationToken ct)
