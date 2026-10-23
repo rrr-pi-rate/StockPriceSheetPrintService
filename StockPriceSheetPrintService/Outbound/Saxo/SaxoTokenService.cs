@@ -58,8 +58,11 @@ namespace StockPriceSheetPrintService.Outbound.Saxo
 
 					if (!response.IsSuccessStatusCode)
 					{
-						_logger.LogError("[SAXO-TOKEN] Saxo rejected refresh token. Status: {status}. Body: {body}",
-							(int)response.StatusCode, responseBody);
+						var saxoCorrelation = response.Headers.TryGetValues("X-Correlation", out var correlationValues)
+							? string.Join(",", correlationValues)
+							: null;
+						_logger.LogError("[SAXO-TOKEN] Saxo rejected refresh token. Status: {status}. XCorrelation: {xCorrelation}. Body: {body}",
+							(int)response.StatusCode, saxoCorrelation, responseBody);
 						await NotifyLoginRequired(ct);
 						return null;
 					}
